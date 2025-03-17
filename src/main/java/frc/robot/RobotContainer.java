@@ -24,7 +24,7 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
  */
 public class RobotContainer {
   final static Arm arm = new Arm();
-  final static Wrist wrist = new Wrist();
+  final static Wrist wrist = new Wrist(arm::getState);
   final static Rollers rollers = new Rollers();
   
   // Replace with CommandPS4Controller or CommandJoystick if needed
@@ -52,7 +52,9 @@ public class RobotContainer {
     return new SequentialCommandGroup(
       arm.setAngle(()->0).until(arm.isAtTarget),
       new WaitCommand(0.5),
-      arm.setAngle(()->90).until(arm.isAtTarget),
+      wrist.setAngle(()->90).until(wrist.isAtTarget),
+      new WaitCommand(0.5),
+      arm.setAngle(()->90).alongWith(wrist.setAngle(()->0)).until(arm.isAtTarget.and(wrist.isAtTarget)),
       new WaitCommand(0.5),
       arm.setAngle(()->0).until(arm.isAtTarget)
     );

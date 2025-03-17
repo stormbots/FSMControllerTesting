@@ -6,37 +6,36 @@ package frc.robot.subsystems.Arm;
 
 import static edu.wpi.first.units.Units.Degree;
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.Radians;
 
 import java.util.function.DoubleSupplier;
 
-import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.REVLibError;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkClosedLoopController.ArbFFUnits;
+import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
-import com.revrobotics.spark.config.SparkFlexConfig;
 import com.revrobotics.spark.config.SparkMaxConfig;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ArmFeedforward;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj.Alert;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Mechanism;
-import frc.robot.MechView;
 
 public class Arm extends SubsystemBase {
 
@@ -45,7 +44,7 @@ public class Arm extends SubsystemBase {
   TrapezoidProfile.Constraints constraints = new TrapezoidProfile.Constraints(30, 60);
   TrapezoidProfile profile = new TrapezoidProfile(constraints);
 
-  ArmFeedforward feedforward = new ArmFeedforward(0.000,0.76,0.01*.8,0.0);
+  ArmFeedforward feedforward = new ArmFeedforward(0.005,0.76,0,0);
 
   ArmSim sim = new ArmSim(motor);
 
@@ -87,7 +86,7 @@ public class Arm extends SubsystemBase {
 
     config.closedLoop
       .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
-      // .p(0.8/60.0*2)
+      .p(0.8/60.0*2*6) //TODO: This last *6 is for my sim
       .positionWrappingEnabled(false)
       .positionWrappingInputRange(0, 360)
       ;
@@ -114,6 +113,15 @@ public class Arm extends SubsystemBase {
 
   public Angle getAngle(){
     return Degree.of(motor.getEncoder().getPosition());
+  }
+  public AngularVelocity getVelocity(){
+    return DegreesPerSecond.of(motor.getEncoder().getVelocity());
+  }
+  public TrapezoidProfile.State getState(){
+    return new TrapezoidProfile.State(
+      motor.getEncoder().getPosition(),
+      motor.getEncoder().getVelocity()
+    );
   }
 
   private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
