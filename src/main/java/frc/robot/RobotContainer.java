@@ -6,6 +6,7 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.FSM;
 import frc.robot.FSM.FSM.MyBotStates;
@@ -63,9 +64,10 @@ public class RobotContainer {
 
     return new SequentialCommandGroup(
       fsm.setWait(MyBotStates.Stow),
-      fsm.setWait(MyBotStates.IntakeFloor),
-      fsm.setWait(MyBotStates.L1),
+      new WaitCommand(1),
       fsm.setWait(MyBotStates.IntakeStation),
+      fsm.setWait(MyBotStates.L1),
+      fsm.setWait(MyBotStates.IntakeFloor),
       fsm.setWait(MyBotStates.L1),
       fsm.setRun(MyBotStates.Stow)
     );

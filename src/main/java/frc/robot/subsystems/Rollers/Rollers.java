@@ -50,14 +50,14 @@ public class Rollers extends SubsystemBase {
   }
 
   public Command intake(){
-    return new RunCommand(()->velocity = RPM.of(2),this)
+    return new RunCommand(()->velocity = RPM.of(10),this)
     .withTimeout(1.5)
     .finallyDo((e)->this.hasCoral=true);
   }
 
   public Command eject(){
-    return new RunCommand(()->velocity = RPM.of(-2),this)
-    .withTimeout(0.5)
+    return new RunCommand(()->velocity = RPM.of(-10),this)
+    .withTimeout(1)
     .finallyDo((e)->this.hasCoral=false)
     ;
   }

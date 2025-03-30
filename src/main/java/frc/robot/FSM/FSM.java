@@ -69,7 +69,6 @@ public class FSM {
 
     /** Wait for the currently set goal state to be reached */
     public Command await(){
-        var goal = stateMap.get(this.goalState);
         return new RunCommand(()->{})
         .until(()->currentState==goalState && goalState.exitCondition.getAsBoolean());
     }
@@ -84,7 +83,7 @@ public class FSM {
         addState(new BotState<MyBotStates>(MyBotStates.Stow,
             ()->new ParallelCommandGroup(
                 arm.setAngle(()->0),
-                wrist.setAngle(()->0),
+                wrist.setAngle(()->120),
                 rollers.stop()
             ),
             arm.isAtTarget.and(wrist.isAtTarget)
@@ -93,7 +92,7 @@ public class FSM {
         addState(new BotState<MyBotStates>(MyBotStates.L1,
         ()->new ParallelCommandGroup(
                 arm.setAngle(()->45),
-                wrist.setAngle(()->45),
+                wrist.setAngle(()->0),
                 rollers.stop()
             ).until(arm.isAtTarget.and(wrist.isAtTarget))
             .andThen(rollers.eject()),
@@ -102,19 +101,19 @@ public class FSM {
 
         addState( new BotState<MyBotStates>(MyBotStates.IntakeStation,
             ()->new ParallelCommandGroup(
-                arm.setAngle(()->80),
-                wrist.setAngle(()->-10),
-                rollers.intake()
-            ),
+                arm.setAngle(()->90),
+                wrist.setAngle(()->10),
+                rollers.stop()
+            ).andThen(rollers.intake()),
             rollers.isHoldingCoral
         ));
 
         addState( new BotState<MyBotStates>(MyBotStates.IntakeFloor,
             ()->new ParallelCommandGroup(
                 arm.setAngle(()->0),
-                wrist.setAngle(()->-10),
-                rollers.intake()
-            ),
+                wrist.setAngle(()->-20),
+                rollers.stop()
+            ).andThen(rollers.intake()),
             rollers.isHoldingCoral
         ));
 
