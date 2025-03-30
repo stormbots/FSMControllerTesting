@@ -42,6 +42,13 @@ public class MechView {
     MechanismLigament2d rollers = wrist.append(new MechanismLigament2d("Rollers", 1, 0));
     MechanismLigament2d rollersR = wrist.append(new MechanismLigament2d("RollersInverse", -1, 0));
     
+    //Visualization bits
+    MechanismLigament2d chassisTop = root.append(new MechanismLigament2d("ChassisTop", 16, 0));
+    MechanismLigament2d chassisBack = root.append(new MechanismLigament2d("ChassisBack", 4, -90));
+    MechanismLigament2d chassisFront = chassisTop.append(new MechanismLigament2d("ChassisBack", 4, -90));
+    MechanismLigament2d wristBackstop = arm.append(new MechanismLigament2d("WristBackstop", 2, 0));
+
+
     public MechView( 
       Arm armSystem,
       Wrist wristSystem,
@@ -69,6 +76,14 @@ public class MechView {
       rollersR.setLineWeight(rollersWidth);
       rollersR.setLength(-rollersLength);
 
+      chassisTop.setColor(new Color8Bit(Color.kDarkGray));
+      chassisFront.setColor(new Color8Bit(Color.kDarkGray));
+      chassisBack.setColor(new Color8Bit(Color.kDarkGray));
+      chassisTop.setLineWeight(1);
+      chassisFront.setLineWeight(1);
+      chassisBack.setLineWeight(1);
+      wristBackstop.setLineWeight(2);
+
       SmartDashboard.putData("mechanism/arm", mech);
       new RunCommand(this::update).ignoringDisable(true).schedule();
       
@@ -80,6 +95,9 @@ public class MechView {
       
       rollers.setAngle(rollersSystem.getAngle().in(Degrees));
       rollersR.setAngle(rollersSystem.getAngle().in(Degrees));
+
+
+      wristBackstop.setAngle(wristSystem.getAngle().plus(Degree.of(-90)).in(Degree));
       
       var color = Color.kOrange;
       var vel = rollersSystem.getVelocity().in(DegreesPerSecond);

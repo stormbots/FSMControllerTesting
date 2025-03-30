@@ -47,8 +47,8 @@ public class ArmSim {
     5*5*64/18.0, 
     armMass*armlength*armlength, 
     armlength, 
-    Degrees.of(-180).in(Radians), 
-    Degrees.of(270).in(Radians), 
+    Degrees.of(-10).in(Radians), 
+    Degrees.of(180+20).in(Radians), 
     true, 
     Degrees.of(90).in(Radians)
   );

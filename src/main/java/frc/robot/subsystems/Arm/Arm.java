@@ -126,9 +126,11 @@ public class Arm extends SubsystemBase {
 
   private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
   private TrapezoidProfile.State goal = new TrapezoidProfile.State();
+  private double startTimer=0;
   public Command setAngle(DoubleSupplier position){
     return startRun(
       ()->{
+        startTimer = Timer.getFPGATimestamp();
         //Seed the initial state/setpoint with the current state
         setpoint = new TrapezoidProfile.State(getAngle().in(Degrees), motor.getEncoder().getVelocity());
       }, 
@@ -148,7 +150,7 @@ public class Arm extends SubsystemBase {
         );
       }
     )
-    // .until(isProfileMotionComplete)
+    .until(isAtTarget.and(()->profile.isFinished(Timer.getFPGATimestamp()-startTimer)))
     ;
   }
 
