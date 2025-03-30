@@ -4,7 +4,7 @@ package frc.robot.FSM;
 class StateMint{
 
 
-    public enum MyBotStates{up,down,maybe,idk};
+    public enum FixmeMyBotStates{up,down,maybe,idk};
     public StateMint(){
         // new BotState(MyBotStates.up, null, null);
     }

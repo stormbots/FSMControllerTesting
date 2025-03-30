@@ -8,6 +8,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.FSM;
+import frc.robot.FSM.FSM.MyBotStates;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
@@ -61,12 +62,12 @@ public class RobotContainer {
     // );
 
     return new SequentialCommandGroup(
-      fsm.setWait(fsm.Stow),
-      fsm.setWait(fsm.IntakeFloor),
-      fsm.setWait(fsm.L1),
-      fsm.setWait(fsm.IntakeStation),
-      fsm.setWait(fsm.L1),
-      fsm.setRun(fsm.Stow)
+      fsm.setWait(MyBotStates.Stow),
+      fsm.setWait(MyBotStates.IntakeFloor),
+      fsm.setWait(MyBotStates.L1),
+      fsm.setWait(MyBotStates.IntakeStation),
+      fsm.setWait(MyBotStates.L1),
+      fsm.setRun(MyBotStates.Stow)
     );
   }
 }
