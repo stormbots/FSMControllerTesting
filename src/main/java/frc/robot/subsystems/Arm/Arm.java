@@ -34,6 +34,7 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
@@ -46,6 +47,11 @@ public class Arm extends SubsystemBase {
 
   ArmFeedforward feedforward = new ArmFeedforward(0.005,0.76,0,0);
 
+  private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
+  private TrapezoidProfile.State goal = new TrapezoidProfile.State();
+  private double startTimer=0;
+
+
   ArmSim sim = new ArmSim(motor);
 
   /** Creates a new Arm. */
@@ -54,7 +60,11 @@ public class Arm extends SubsystemBase {
     //Configure the encoder
     configureMotor();
 
-    setDefaultCommand(stop());
+    setDefaultCommand(new ConditionalCommand(
+      setAngle(()->goal.position).repeatedly(),
+      stop(),
+      isAtTarget
+    ));
   }
 
   public void configureMotor(){
@@ -124,9 +134,6 @@ public class Arm extends SubsystemBase {
     );
   }
 
-  private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
-  private TrapezoidProfile.State goal = new TrapezoidProfile.State();
-  private double startTimer=0;
   public Command setAngle(DoubleSupplier position){
     return startRun(
       ()->{
@@ -150,7 +157,7 @@ public class Arm extends SubsystemBase {
         );
       }
     )
-    .until(isAtTarget.and(()->profile.isFinished(Timer.getFPGATimestamp()-startTimer)))
+    // .until(isAtTarget.and(()->profile.isFinished(Timer.getFPGATimestamp()-startTimer)))
     ;
   }
 

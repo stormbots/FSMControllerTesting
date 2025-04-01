@@ -39,11 +39,12 @@ public class RobotContainer {
 
   private void configureBindings() {
 
+    driver.y().whileTrue(fsm.setRun(MyBotStates.L1));
+    driver.b().whileTrue(fsm.setRun(MyBotStates.IntakeFloor));
+    driver.x().whileTrue(fsm.setRun(MyBotStates.IntakeStation));
+    driver.a().whileTrue(fsm.setRun(MyBotStates.Stow));
+
   }
-
-
-
-
 
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.
@@ -51,20 +52,10 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    // An example command will be run in autonomous
-    // return new SequentialCommandGroup(
-    //   arm.setAngle(()->0).until(arm.isAtTarget).withTimeout(5),
-    //   new WaitCommand(0.5),
-    //   wrist.setAngle(()->90).until(wrist.isAtTarget).withTimeout(5),
-    //   new WaitCommand(0.5),
-    //   arm.setAngle(()->90).alongWith(wrist.setAngle(()->0)).until(arm.isAtTarget.and(wrist.isAtTarget)),
-    //   new WaitCommand(0.5),
-    //   arm.setAngle(()->0).until(arm.isAtTarget)
-    // );
-
     return new SequentialCommandGroup(
-      fsm.setWait(MyBotStates.Stow),
-      new WaitCommand(1),
+      fsm.setRunAsync(MyBotStates.Stow),
+      new WaitCommand(3), //do a drive or something
+      // fsm.await(),//Wait for structure to be done
       fsm.setWait(MyBotStates.IntakeStation),
       fsm.setWait(MyBotStates.L1),
       fsm.setWait(MyBotStates.IntakeFloor),

@@ -104,7 +104,8 @@ public class FSM {
                 arm.setAngle(()->90),
                 wrist.setAngle(()->10),
                 rollers.stop()
-            ).andThen(rollers.intake()),
+            ).until(arm.isAtTarget.and(wrist.isAtTarget))
+            .andThen(rollers.intake()),
             rollers.isHoldingCoral
         ));
 
@@ -113,7 +114,8 @@ public class FSM {
                 arm.setAngle(()->0),
                 wrist.setAngle(()->-20),
                 rollers.stop()
-            ).andThen(rollers.intake()),
+            ).until(arm.isAtTarget.and(wrist.isAtTarget))
+            .andThen(rollers.intake()),
             rollers.isHoldingCoral
         ));
 

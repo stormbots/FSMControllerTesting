@@ -32,6 +32,7 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
@@ -57,7 +58,11 @@ public class Wrist extends SubsystemBase {
     //TODO: use armStateProvider
     this.armStateProvider = armStateProvider;
 
-    setDefaultCommand(stop());
+    setDefaultCommand(new ConditionalCommand(
+      setAngle(()->goal.position).repeatedly(),
+      stop(),
+      isAtTarget
+    ));
   }
 
   public void configureMotor(){
@@ -144,7 +149,7 @@ public class Wrist extends SubsystemBase {
         );
       }
     )
-    .until(isAtTarget.and(()->profile.isFinished(Timer.getFPGATimestamp()-startTimer)))
+    // .until(isAtTarget.and(()->profile.isFinished(Timer.getFPGATimestamp()-startTimer)))
     ;
   }
 
