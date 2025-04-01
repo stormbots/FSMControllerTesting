@@ -42,7 +42,7 @@ public class Arm extends SubsystemBase {
 
   SparkFlex motor = new SparkFlex(10, MotorType.kBrushless);
 
-  TrapezoidProfile.Constraints constraints = new TrapezoidProfile.Constraints(30, 60);
+  TrapezoidProfile.Constraints constraints = new TrapezoidProfile.Constraints(90, 180);
   TrapezoidProfile profile = new TrapezoidProfile(constraints);
 
   ArmFeedforward feedforward = new ArmFeedforward(0.005,0.76,0,0);

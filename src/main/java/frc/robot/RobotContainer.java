@@ -5,9 +5,12 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import frc.robot.FSM.BotState;
 import frc.robot.FSM.FSM;
 import frc.robot.FSM.FSM.MyBotStates;
 import frc.robot.subsystems.Arm.Arm;
@@ -33,6 +36,7 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+    initStates();
     // Configure the trigger bindings
     configureBindings();
   }
@@ -53,14 +57,61 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return new SequentialCommandGroup(
-      fsm.setRunAsync(MyBotStates.Stow),
-      new WaitCommand(3), //do a drive or something
-      // fsm.await(),//Wait for structure to be done
+      fsm.set(MyBotStates.Stow),
+      Commands.waitSeconds(1),
       fsm.setWait(MyBotStates.IntakeStation),
+      fsm.setWait(MyBotStates.Stow),
       fsm.setWait(MyBotStates.L1),
+      fsm.setWait(MyBotStates.Stow),
       fsm.setWait(MyBotStates.IntakeFloor),
+      fsm.setWait(MyBotStates.Stow),
       fsm.setWait(MyBotStates.L1),
       fsm.setRun(MyBotStates.Stow)
     );
   }
+
+
+
+  public void initStates(){
+      fsm.addState(new BotState<MyBotStates>(MyBotStates.Stow,
+          ()->new ParallelCommandGroup(
+              arm.setAngle(()->0),
+              wrist.setAngle(()->120),
+              rollers.stop()
+          ),
+          arm.isAtTarget.and(wrist.isAtTarget)
+      ));
+
+      fsm.addState(new BotState<MyBotStates>(MyBotStates.L1,
+      ()->new ParallelCommandGroup(
+              arm.setAngle(()->45),
+              wrist.setAngle(()->0),
+              rollers.stop()
+          ).until(arm.isAtTarget.and(wrist.isAtTarget))
+          .andThen(rollers.eject()),
+          rollers.isHoldingCoral.negate()
+      ));
+
+      fsm.addState( new BotState<MyBotStates>(MyBotStates.IntakeStation,
+          ()->new ParallelCommandGroup(
+              arm.setAngle(()->90),
+              wrist.setAngle(()->10),
+              rollers.stop()
+          ).until(arm.isAtTarget.and(wrist.isAtTarget))
+          .andThen(rollers.intake()),
+          rollers.isHoldingCoral
+      ));
+
+      fsm.addState( new BotState<MyBotStates>(MyBotStates.IntakeFloor,
+          ()->new ParallelCommandGroup(
+              arm.setAngle(()->0),
+              wrist.setAngle(()->-20),
+              rollers.stop()
+          ).until(arm.isAtTarget.and(wrist.isAtTarget))
+          .andThen(rollers.intake()),
+          rollers.isHoldingCoral
+      ));
+
+  }
+
 }
