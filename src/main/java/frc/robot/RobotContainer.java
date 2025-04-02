@@ -12,7 +12,7 @@ import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.BotState;
 import frc.robot.FSM.FSM;
-import frc.robot.FSM.FSM.MyBotStates;
+import frc.robot.FSM.FSM.StateEnum;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
@@ -32,7 +32,7 @@ public class RobotContainer {
   private final CommandXboxController driver = new CommandXboxController(0);
 
   MechView mechanism = new MechView(arm,wrist,rollers);
-  FSM fsm = new FSM(arm,wrist,rollers);
+  FSM fsm = new FSM();
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -43,10 +43,10 @@ public class RobotContainer {
 
   private void configureBindings() {
 
-    driver.y().whileTrue(fsm.setRun(MyBotStates.L1));
-    driver.b().whileTrue(fsm.setRun(MyBotStates.IntakeFloor));
-    driver.x().whileTrue(fsm.setRun(MyBotStates.IntakeStation));
-    driver.a().whileTrue(fsm.setRun(MyBotStates.Stow));
+    driver.y().whileTrue(fsm.setRun(StateEnum.L1));
+    driver.b().whileTrue(fsm.setRun(StateEnum.IntakeFloor));
+    driver.x().whileTrue(fsm.setRun(StateEnum.IntakeStation));
+    driver.a().whileTrue(fsm.setRun(StateEnum.Stow));
 
   }
 
@@ -57,23 +57,23 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return new SequentialCommandGroup(
-      fsm.set(MyBotStates.Stow),
-      Commands.waitSeconds(1),
-      fsm.setWait(MyBotStates.IntakeStation),
-      fsm.setWait(MyBotStates.Stow),
-      fsm.setWait(MyBotStates.L1),
-      fsm.setWait(MyBotStates.Stow),
-      fsm.setWait(MyBotStates.IntakeFloor),
-      fsm.setWait(MyBotStates.Stow),
-      fsm.setWait(MyBotStates.L1),
-      fsm.setRun(MyBotStates.Stow)
+      // fsm.set(StateEnum.Stow),
+      // Commands.waitSeconds(1),
+      fsm.setWait(StateEnum.IntakeStation).withTimeout(3),
+      fsm.setWait(StateEnum.Stow),
+      fsm.setWait(StateEnum.L1),
+      fsm.setWait(StateEnum.Stow),
+      fsm.setWait(StateEnum.IntakeFloor),
+      fsm.setWait(StateEnum.Stow),
+      fsm.setWait(StateEnum.L1),
+      fsm.setRun(StateEnum.Stow)
     );
   }
 
 
 
   public void initStates(){
-      fsm.addState(new BotState<MyBotStates>(MyBotStates.Stow,
+      fsm.addState(new BotState<StateEnum>(StateEnum.Stow,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
               wrist.setAngle(()->120),
@@ -82,7 +82,7 @@ public class RobotContainer {
           arm.isAtTarget.and(wrist.isAtTarget)
       ));
 
-      fsm.addState(new BotState<MyBotStates>(MyBotStates.L1,
+      fsm.addState(new BotState<StateEnum>(StateEnum.L1,
       ()->new ParallelCommandGroup(
               arm.setAngle(()->45),
               wrist.setAngle(()->0),
@@ -92,7 +92,7 @@ public class RobotContainer {
           rollers.isHoldingCoral.negate()
       ));
 
-      fsm.addState( new BotState<MyBotStates>(MyBotStates.IntakeStation,
+      fsm.addState( new BotState<StateEnum>(StateEnum.IntakeStation,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->90),
               wrist.setAngle(()->10),
@@ -102,7 +102,7 @@ public class RobotContainer {
           rollers.isHoldingCoral
       ));
 
-      fsm.addState( new BotState<MyBotStates>(MyBotStates.IntakeFloor,
+      fsm.addState( new BotState<StateEnum>(StateEnum.IntakeFloor,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
               wrist.setAngle(()->-20),
