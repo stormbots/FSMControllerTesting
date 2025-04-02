@@ -8,11 +8,9 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import frc.robot.FSM.BotState;
 import frc.robot.FSM.FSM;
-import frc.robot.FSM.FSM.StateEnum;
+import frc.robot.FSM.FSM.FSMState;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
@@ -32,7 +30,15 @@ public class RobotContainer {
   private final CommandXboxController driver = new CommandXboxController(0);
 
   MechView mechanism = new MechView(arm,wrist,rollers);
-  FSM fsm = new FSM();
+
+
+  public enum BotState{
+    Stow,
+    L1,
+    IntakeFloor,
+    IntakeStation
+  }
+  FSM<BotState> fsm = new FSM<>();
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -43,10 +49,10 @@ public class RobotContainer {
 
   private void configureBindings() {
 
-    driver.y().whileTrue(fsm.setRun(StateEnum.L1));
-    driver.b().whileTrue(fsm.setRun(StateEnum.IntakeFloor));
-    driver.x().whileTrue(fsm.setRun(StateEnum.IntakeStation));
-    driver.a().whileTrue(fsm.setRun(StateEnum.Stow));
+    driver.y().whileTrue(fsm.setRun(BotState.L1));
+    driver.b().whileTrue(fsm.setRun(BotState.IntakeFloor));
+    driver.x().whileTrue(fsm.setRun(BotState.IntakeStation));
+    driver.a().whileTrue(fsm.setRun(BotState.Stow));
 
   }
 
@@ -57,42 +63,42 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return new SequentialCommandGroup(
-      // fsm.set(StateEnum.Stow),
-      // Commands.waitSeconds(1),
-      fsm.setWait(StateEnum.IntakeStation).withTimeout(3),
-      fsm.setWait(StateEnum.Stow),
-      fsm.setWait(StateEnum.L1),
-      fsm.setWait(StateEnum.Stow),
-      fsm.setWait(StateEnum.IntakeFloor),
-      fsm.setWait(StateEnum.Stow),
-      fsm.setWait(StateEnum.L1),
-      fsm.setRun(StateEnum.Stow)
+      fsm.set(BotState.Stow),
+      Commands.waitSeconds(1),
+      fsm.setWait(BotState.IntakeStation),
+      fsm.setWait(BotState.Stow),
+      fsm.setWait(BotState.L1),
+      fsm.setWait(BotState.Stow),
+      fsm.setWait(BotState.IntakeFloor),
+      fsm.setWait(BotState.Stow),
+      fsm.setWait(BotState.L1),
+      fsm.setRun(BotState.Stow)
     );
   }
 
 
 
   public void initStates(){
-      fsm.addState(new BotState<StateEnum>(StateEnum.Stow,
+      fsm.addState(BotState.Stow,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
               wrist.setAngle(()->120),
               rollers.stop()
           ),
           arm.isAtTarget.and(wrist.isAtTarget)
-      ));
+      );
 
-      fsm.addState(new BotState<StateEnum>(StateEnum.L1,
-      ()->new ParallelCommandGroup(
+      fsm.addState(BotState.L1,
+        ()->new ParallelCommandGroup(
               arm.setAngle(()->45),
               wrist.setAngle(()->0),
               rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.eject()),
           rollers.isHoldingCoral.negate()
-      ));
+      );
 
-      fsm.addState( new BotState<StateEnum>(StateEnum.IntakeStation,
+      fsm.addState( BotState.IntakeStation,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->90),
               wrist.setAngle(()->10),
@@ -100,9 +106,9 @@ public class RobotContainer {
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
           rollers.isHoldingCoral
-      ));
+      );
 
-      fsm.addState( new BotState<StateEnum>(StateEnum.IntakeFloor,
+      fsm.addState( BotState.IntakeFloor,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
               wrist.setAngle(()->-20),
@@ -110,8 +116,9 @@ public class RobotContainer {
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
           rollers.isHoldingCoral
-      ));
+      );
 
   }
+
 
 }

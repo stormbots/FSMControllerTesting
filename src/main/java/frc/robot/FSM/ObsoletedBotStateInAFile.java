@@ -6,7 +6,7 @@ import java.util.function.Supplier;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 
-public class BotState<T extends Enum<T>>{
+public class ObsoletedBotStateInAFile<T extends Enum<T>>{
     public Supplier<Command> commandSupplier = ()->new InstantCommand();
     public BooleanSupplier exitCondition=()->false;
 
@@ -23,7 +23,7 @@ public class BotState<T extends Enum<T>>{
      * @param commandSupplier
      * @param exitCondition
      */
-    public BotState(T name, Supplier<Command> commandSupplier, BooleanSupplier exitCondition){
+    public ObsoletedBotStateInAFile(T name, Supplier<Command> commandSupplier, BooleanSupplier exitCondition){
         System.out.println(name.toString());
         this.name = name;
         this.commandSupplier = commandSupplier;
