@@ -1,7 +1,9 @@
 package frc.robot.FSM;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 import edu.wpi.first.wpilibj.DriverStation;
@@ -23,6 +25,7 @@ public class FSM<T extends Enum<T>> {
 
 
     public FSM(){
+        //TODO: Consider forcing an "error" response for null maps, just to prevent confusion
 
         new RunCommand(this::periodic)
         .withName("FSM Status")
@@ -94,14 +97,28 @@ public class FSM<T extends Enum<T>> {
         return Commands.waitUntil(()->activeState==goalState && goalState.exitCondition.getAsBoolean());
     }
 
-    public void addState(FSMState<T> state){
+    public FSM<T> addState(FSMState<T> state){
         if(activeState==null) activeState = state;
         if(goalState==null) goalState = activeState;
         stateMap.put(state.name, state);
+        return this;
     }
 
-    public void addState(T name, Supplier<Command> command,BooleanSupplier exitSupplier){
+    public FSM<T> addState(T name, Supplier<Command> command,BooleanSupplier exitSupplier){
         addState(new FSMState<T>(name,command,exitSupplier));
+        return this;
+
+    }
+
+    public FSM<T> connect(T state1, T state2, Double cost, boolean bidirectional){
+        stateMap.get(state1).addConnection(state2, cost);
+        if(bidirectional) stateMap.get(state2).addConnection(state1, cost);
+        return this;
+    }
+
+    public FSM<T> connect(T state1, T state2, Double cost){
+        connect(state1, state2, cost,true);
+        return this;
     }
 
 
@@ -111,7 +128,8 @@ public class FSM<T extends Enum<T>> {
         public Supplier<Command> commandSupplier = ()->new InstantCommand();
         public BooleanSupplier exitCondition=()->false;
         T name;
-        
+        public HashMap<T,Double> connections = new HashMap<>();
+
         /**
          * Provide a state with name, command, and exit conditions.
          * @param name
@@ -124,6 +142,16 @@ public class FSM<T extends Enum<T>> {
             this.commandSupplier = commandSupplier;
             this.exitCondition = exitCondition;
         }
+
+        public FSMState addConnection(T otherstate, Double cost){
+            connections.put(otherstate,cost);
+            return this;
+        }
     }
+
+    //TODO: Missing useful items
+    // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
+    // Auto-transition to state when executed as target state and done 
+    //"distance" function for the FSM to attempt state recovery
 
 }

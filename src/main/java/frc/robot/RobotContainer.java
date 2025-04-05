@@ -10,7 +10,6 @@ import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.FSM;
-import frc.robot.FSM.FSM.FSMState;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
