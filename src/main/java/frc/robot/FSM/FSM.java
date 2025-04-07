@@ -137,7 +137,7 @@ public class FSM<T extends Enum<T>> {
          * @param exitCondition
          */
         public FSMState(T name, Supplier<Command> commandSupplier, BooleanSupplier exitCondition){
-            System.out.println(name.toString());
+            // System.out.println(name.toString());
             this.name = name;
             this.commandSupplier = commandSupplier;
             this.exitCondition = exitCondition;
@@ -153,5 +153,10 @@ public class FSM<T extends Enum<T>> {
     // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
     // Auto-transition to state when executed as target state and done 
     //"distance" function for the FSM to attempt state recovery
+    //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
+
+    //Have the path tracker take <T enum, N node> and then do a thin wrapper to convert N to an internal type.
+    // Then it can have an interface for changing strategies, and return a list of N without having to 
+    // care about's actual implementation
 
 }

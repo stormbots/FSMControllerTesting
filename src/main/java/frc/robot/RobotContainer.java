@@ -4,6 +4,8 @@
 
 package frc.robot;
 
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
@@ -44,6 +46,9 @@ public class RobotContainer {
     initStates();
     // Configure the trigger bindings
     configureBindings();
+
+    djsetup();
+    
   }
 
   private void configureBindings() {
@@ -117,6 +122,53 @@ public class RobotContainer {
           rollers.isHoldingCoral
       );
 
+  }
+
+
+  DJ<BotState> dj = new DJ<>();
+  String outputString="";
+  BotState start=BotState.IntakeStation;
+  BotState end=BotState.L1;
+
+  public void djsetup(){
+    for(var k:BotState.values()) dj.addNode(k); // this can be shoved into dj
+
+    dj.addConnection(BotState.Stow, BotState.IntakeStation, 1,true);
+    dj.addConnection(BotState.Stow, BotState.IntakeFloor, 1,true);
+    dj.addConnection(BotState.Stow, BotState.L1, 1,true);
+    dj.addConnection(BotState.IntakeFloor, BotState.L1, 1,true);
+    
+    var selectstart=new SendableChooser<BotState>(); //TODO: Add this via FSM once
+    for(var k:BotState.values()) selectstart.addOption(k.toString(), k);
+    selectstart.setDefaultOption(BotState.IntakeStation.toString(), BotState.IntakeStation);
+    selectstart.onChange(this::updateStart);
+
+    var selectend=new SendableChooser<BotState>(); //TODO: Add this via FSM once
+    for(var k:BotState.values()) selectend.addOption(k.toString(), k);
+    selectend.setDefaultOption(BotState.L1.toString(), BotState.L1);
+    selectend.onChange(this::updateEnd);
+
+    SmartDashboard.putData("dj/start",selectstart);
+    SmartDashboard.putData("dj/end",selectend);
+    // SmartDashboard.putString("dj/output",outputString);
+    update();
+  }
+
+  void updateStart(BotState state){
+    start=state;
+    update();
+  }
+  void updateEnd(BotState state){
+    end=state;
+    update();
+  }
+
+  void update(){
+    var plswork=dj.computeCosts(start,end);
+    outputString="";
+    plswork.forEach((v)->outputString+=v.tag.toString()+"("+v.cost+")->");
+    SmartDashboard.putString("dj/output",outputString);
+    System.out.println(outputString);
   }
 
 
