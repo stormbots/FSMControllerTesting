@@ -140,6 +140,8 @@ public class Arm extends SubsystemBase {
         startTimer = Timer.getFPGATimestamp();
         //Seed the initial state/setpoint with the current state
         setpoint = new TrapezoidProfile.State(getAngle().in(Degrees), motor.getEncoder().getVelocity());
+        //Update in the Init to prevent trigger timing misfires 
+        goal = new TrapezoidProfile.State(position.getAsDouble(), 0);
       }, 
       ()->{
         //Make sure the goal is dynamically updated
@@ -171,11 +173,11 @@ public class Arm extends SubsystemBase {
   public Trigger isAtTarget = new Trigger(()->
     MathUtil.isNear(goal.position, motor.getEncoder().getPosition(), 2)
     &&MathUtil.isNear(goal.velocity, motor.getEncoder().getVelocity(), 20)
-  ).debounce(0.05);
+  );
 
   Trigger isRoughlyAtTarget = new Trigger(()->
     MathUtil.isNear(goal.position, motor.getEncoder().getPosition(), 10)
     &&MathUtil.isNear(goal.velocity, motor.getEncoder().getVelocity(), 100)
-  ).debounce(0.05);
+  );
 
 }

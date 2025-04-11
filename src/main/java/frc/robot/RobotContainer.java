@@ -4,12 +4,14 @@
 
 package frc.robot;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.FSM;
 import frc.robot.subsystems.Arm.Arm;
@@ -43,11 +45,12 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+    DriverStation.silenceJoystickConnectionWarning(true);
     initStates();
     // Configure the trigger bindings
     configureBindings();
 
-    djsetup();
+    // djsetup();
     
   }
 
@@ -66,18 +69,47 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    // return new SequentialCommandGroup(
+    //   fsm.set(BotState.Stow),
+    //   Commands.waitSeconds(1),
+    //   fsm.setWait(BotState.IntakeStation),
+    //   fsm.setWait(BotState.Stow),
+    //   fsm.setWait(BotState.L1),
+    //   fsm.setWait(BotState.Stow),
+    //   fsm.setWait(BotState.IntakeFloor),
+    //   fsm.setWait(BotState.Stow),
+    //   fsm.setWait(BotState.L1),
+    //   fsm.setRun(BotState.Stow)
+    // );
+
     return new SequentialCommandGroup(
-      fsm.set(BotState.Stow),
-      Commands.waitSeconds(1),
-      fsm.setWait(BotState.IntakeStation),
-      fsm.setWait(BotState.Stow),
-      fsm.setWait(BotState.L1),
-      fsm.setWait(BotState.Stow),
-      fsm.setWait(BotState.IntakeFloor),
-      fsm.setWait(BotState.Stow),
-      fsm.setWait(BotState.L1),
-      fsm.setRun(BotState.Stow)
+      Commands.print("AUTO initial stow"),
+      fsm.forceState(BotState.Stow),
+      fsm.await().withTimeout(3),
+
+      Commands.print("AUTO Station"),
+      fsm.pathToState(BotState.IntakeStation),
+
+      Commands.print("AUTO L1"),
+      fsm.pathToState(BotState.L1),
+
+      Commands.print("AUTO Floor"),
+      fsm.pathToState(BotState.IntakeFloor),
+
+      Commands.print("AUTO L1 Again"),
+      fsm.pathToState(BotState.L1),
+
+      // fsm.pathToState(BotState.L1),
+      // fsm.pathToState(BotState.IntakeFloor),
+      // fsm.pathToState(BotState.L1),
+      // fsm.pathToState(BotState.Stow),
+      // Commands.waitSeconds(3),
+      // fsm.pathToState(BotState.IntakeStation),
+      // fsm.pathToState(BotState.L1)
+      Commands.none()
     );
+
+
   }
 
 
@@ -122,54 +154,66 @@ public class RobotContainer {
           rollers.isHoldingCoral
       );
 
+      fsm.connect(BotState.Stow, BotState.IntakeStation, 1.0);
+      fsm.connect(BotState.Stow, BotState.L1, 1.0);
+      fsm.connect(BotState.Stow, BotState.IntakeFloor, 1.0);  
   }
 
 
-  DJ<BotState> dj = new DJ<>();
-  String outputString="";
-  BotState start=BotState.IntakeStation;
-  BotState end=BotState.L1;
+  // enum ComplexBot{leftdown,leftup,left,right,rightdown,rightup};
 
-  public void djsetup(){
-    for(var k:BotState.values()) dj.addNode(k); // this can be shoved into dj
+  // Dijkstra<BotState> dj = new Dijkstra<>();
+  // String outputString="";
+  // BotState start=BotState.IntakeFloor;
+  // BotState end=BotState.IntakeStation;
 
-    dj.addConnection(BotState.Stow, BotState.IntakeStation, 1,true);
-    dj.addConnection(BotState.Stow, BotState.IntakeFloor, 1,true);
-    dj.addConnection(BotState.Stow, BotState.L1, 1,true);
-    dj.addConnection(BotState.IntakeFloor, BotState.L1, 1,true);
+  // public void djsetup(){
+  //   if(true) return;
+  //   for(var k:BotState.values()) dj.addNode(k); // this can be shoved into dj
+
+  //   dj.addConnection(BotState.Stow, BotState.IntakeStation, 1,true);
+  //   dj.addConnection(BotState.Stow, BotState.IntakeFloor, 1,true);
+  //   dj.addConnection(BotState.Stow, BotState.L1, 1,true);
+  //   dj.addConnection(BotState.IntakeFloor, BotState.L1, 1,true);
     
-    var selectstart=new SendableChooser<BotState>(); //TODO: Add this via FSM once
-    for(var k:BotState.values()) selectstart.addOption(k.toString(), k);
-    selectstart.setDefaultOption(BotState.IntakeStation.toString(), BotState.IntakeStation);
-    selectstart.onChange(this::updateStart);
+  //   var selectstart=new SendableChooser<BotState>(); //TODO: Add this via FSM once
+  //   for(var k:BotState.values()) selectstart.addOption(k.toString(), k);
+  //   selectstart.setDefaultOption(BotState.IntakeStation.toString(), BotState.IntakeStation);
+  //   selectstart.onChange(this::updateStart);
 
-    var selectend=new SendableChooser<BotState>(); //TODO: Add this via FSM once
-    for(var k:BotState.values()) selectend.addOption(k.toString(), k);
-    selectend.setDefaultOption(BotState.L1.toString(), BotState.L1);
-    selectend.onChange(this::updateEnd);
+  //   var selectend=new SendableChooser<BotState>(); //TODO: Add this via FSM once
+  //   for(var k:BotState.values()) selectend.addOption(k.toString(), k);
+  //   selectend.setDefaultOption(BotState.L1.toString(), BotState.L1);
+  //   selectend.onChange(this::updateEnd);
 
-    SmartDashboard.putData("dj/start",selectstart);
-    SmartDashboard.putData("dj/end",selectend);
-    // SmartDashboard.putString("dj/output",outputString);
-    update();
-  }
+  //   SmartDashboard.putData("dj/start",selectstart);
+  //   SmartDashboard.putData("dj/end",selectend);
+  //   // SmartDashboard.putString("dj/output",outputString);
+  //   // update();
 
-  void updateStart(BotState state){
-    start=state;
-    update();
-  }
-  void updateEnd(BotState state){
-    end=state;
-    update();
-  }
+  //   dj.computeCosts(BotState.IntakeStation,BotState.IntakeFloor);
+  //   dj.computeCosts(BotState.Stow,BotState.L1);
+  //   dj.computeCosts(BotState.L1,BotState.IntakeFloor);
+  //   dj.computeCosts(BotState.L1,BotState.IntakeStation);
 
-  void update(){
-    var plswork=dj.computeCosts(start,end);
-    outputString="";
-    plswork.forEach((v)->outputString+=v.tag.toString()+"("+v.cost+")->");
-    SmartDashboard.putString("dj/output",outputString);
-    System.out.println(outputString);
-  }
+  // }
+
+  // void updateStart(BotState state){
+  //   start=state;
+  //   update();
+  // }
+  // void updateEnd(BotState state){
+  //   end=state;
+  //   update();
+  // }
+
+  // void update(){
+  //   var plswork=dj.computeCosts(start,end);
+  //   outputString="";
+  //   plswork.forEach((v)->outputString+=v.toString()+"("+dj.graph.get(v).cost+")->");
+  //   SmartDashboard.putString("dj/output",outputString);
+  //   System.out.println(outputString);
+  // }
 
 
 }

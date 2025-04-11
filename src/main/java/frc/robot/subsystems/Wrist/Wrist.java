@@ -132,6 +132,8 @@ public class Wrist extends SubsystemBase {
         startTimer = Timer.getFPGATimestamp();
         //Seed the initial state/setpoint with the current state
         setpoint = new TrapezoidProfile.State(getAngle().in(Degrees), motor.getEncoder().getVelocity());
+        //Update in the Init to prevent trigger timing misfires 
+        goal = new TrapezoidProfile.State(position.getAsDouble(), 0);
       }, 
       ()->{
         //Make sure the goal is dynamically updated
