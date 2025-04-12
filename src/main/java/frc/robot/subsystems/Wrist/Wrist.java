@@ -41,7 +41,7 @@ public class Wrist extends SubsystemBase {
   
   SparkFlex motor = new SparkFlex(11, MotorType.kBrushless);
 
-  TrapezoidProfile.Constraints constraints = new TrapezoidProfile.Constraints(120, 180);
+  TrapezoidProfile.Constraints constraints = new TrapezoidProfile.Constraints(200, 260);
   TrapezoidProfile profile = new TrapezoidProfile(constraints);
 
   ArmFeedforward feedforward = new ArmFeedforward(0.005,0.76,0,0);
