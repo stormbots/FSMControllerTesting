@@ -1,0 +1,67 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
+package frc.robot.subsystems;
+
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.StartEndCommand;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.FSM.FSM;
+
+public class CyclingFSM extends SubsystemBase {
+  enum States{a,b,c,d,even,odd};
+  FSM<States> fsm = new FSM<>(States.a);
+
+  // Logger log = Logger.getAnonymousLogger();
+  /** Creates a new CyclingFSM. */
+  public CyclingFSM() {
+
+    // log.setLevel(Level.WARNING);
+    // log.config("Setting up states");
+    fsm.addState(States.a, ()->printy("a"), ()->true);
+    fsm.addState(States.b, ()->printy("b"), ()->true);
+    fsm.addState(States.c, ()->printy("c"), ()->false);
+    fsm.addState(States.d, ()->printy("d"), ()->true);
+    fsm.addState(States.even, ()->printy("even"), ()->true);
+    fsm.addState(States.odd, ()->printy("odd"), ()->true);
+
+    fsm.connect(States.a, States.b,1,false);
+    fsm.connect(States.b, States.c,1,false);
+    fsm.connect(States.c, States.d,1,false);
+    fsm.connect(States.d, States.even,1,false);
+    fsm.connect(States.d, States.odd,1,false);
+    fsm.connect(States.even, States.a,1,false);
+    fsm.connect(States.odd, States.a,1,false);
+
+    fsm.addAutoTransition(States.a, States.b);
+    fsm.addAutoTransition(States.b, States.c);
+    fsm.addAutoTransition(States.c, States.d);
+    fsm.addAutoTransition(States.d, States.even, ()->(int)Timer.getFPGATimestamp()%2==0);
+    fsm.addAutoTransition(States.d, States.odd, ()->(int)Timer.getFPGATimestamp()%2==1);
+    fsm.addAutoTransition(States.even, States.a);
+    fsm.addAutoTransition(States.odd, States.a);
+
+    // log.warning("OH NO IT'S WORKIng");
+    // log.severe("good job hero");
+  }
+
+  public Command printy(String str){
+    return new StartEndCommand(
+      ()->System.out.println("Start  "+str),
+      ()->System.out.println("Ending "+str),
+      this
+    )
+    .withTimeout(1.5)
+    ;
+  }
+
+  @Override
+  public void periodic() {
+    // This method will be called once per scheduler run
+    SmartDashboard.putString("cycle/current", fsm.getCurrentState().name.toString());
+    SmartDashboard.putBoolean("cycle/done?", fsm.activeCommand.isScheduled());
+  }
+}

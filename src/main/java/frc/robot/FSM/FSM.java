@@ -2,23 +2,17 @@ package frc.robot.FSM;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Stack;
 import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Dijkstra;
 
@@ -27,7 +21,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     HashMap<T,FSMState<T>> stateMap = new HashMap<>();
     FSMState<T> activeState;
     // FSMState<T> goalState;
-    private Command activeCommand = Commands.none();
+    public Command activeCommand = Commands.none();
     private boolean running=false;
     private T initialState;
 
@@ -40,6 +34,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     public FSM(T initialState){
         //This is just to prevent potential null references throughout the code.
+        //Adding the state definition later will overwrite this. 
         this.initialState=initialState;
         this.activeState=new FSMState<T>(initialState, Commands::none, ()->false);
 
@@ -52,38 +47,50 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
 
     public void manageStates(){
-        SmartDashboard.putBoolean("fsm/atgoalstate",isAtGoalState.getAsBoolean());
-
-        //TODO Find a better way to handle these.
-        if(activeState==null) return;
-        //If uninitialized, do something smart, we just can't fallthrough properly otherwise.
+        // SmartDashboard.putBoolean("fsm/atgoalstate",isAtGoalState.getAsBoolean());
 
         //Walk through our state queue
         //We only need to care about exit condition if we have more states.
         if(activeState.exitCondition.getAsBoolean() && statePath.size()>0){
-            System.out.println("Updating to " +statePath.peek());
+            System.out.println("Updating to "+statePath.peek());
             activeCommand.cancel();
             activeState = stateMap.get(statePath.poll());
             activeCommand=activeState.commandSupplier.get();
             activeCommand.schedule();
         }
-        else if(activeState==null && statePath.size()>0){
-            System.out.println("Initial scheduling " + statePath.peek());
-            activeCommand.cancel();
-            activeState = stateMap.get(statePath.poll());
-            activeCommand=activeState.commandSupplier.get();
-            activeCommand.schedule();
+        else if(activeCommand.isScheduled()==false && activeState.autotransitions.size()>0){
+            //We have automated transition conditions. Check them. 
+            for(var transition: activeState.autotransitions){
+                if(transition.condition.getAsBoolean()){
+                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
+                    activeCommand.cancel();//redundant but nonissue
+                    activeState = stateMap.get(transition.destination);
+                    activeCommand=activeState.commandSupplier.get();
+                    activeCommand.schedule();
+                    break; //Don't check more conditions; First come first served.
+                }
+                // else{
+                //     System.out.println("Not transitioning from  "+activeState.name +" to " +transition.destination);
+                // }
+            }
         }
-        else if(activeCommand.isFinished()){
-            System.out.println("Permascheduling "+statePath.peek());
-            //TODO: Check for automatic state transitions
+        else if(activeCommand.isScheduled()==false){
+            //Goal commands generally shouldn't exit without some automated transition defined.
+            //In this case, just reschedule it 
+            System.out.println("Permascheduling "+activeState.name);
             //Otherwise this generally shouldn't happen. Reschedule it without exit conditions
             activeCommand = activeState.commandSupplier.get().repeatedly();
             activeCommand.schedule();
         }
 
+        //NOTE TO SELF: command.isFinished() often gets broken by wrapper commands,
+        //causing transition failures. Checking isScheduled() works as expected.
+
     }
 
+    public FSMState<T> getCurrentState(){
+        return activeState;
+    }
 
     /** Set the state and wait for completion. Good for sequencing. */
     public Command setWait(T state){
@@ -136,10 +143,8 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      * @return
      */
     public FSM<T> addState(FSMState<T> state){
-        if(activeState==null) activeState = state;
         if(state.name==initialState) activeState = state;
         stateMap.put(state.name, state);
-
         stateRouter.addNode(state.name);
         return this;
     }
@@ -165,15 +170,33 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     }
 
+    /** Connect two states, allowing unidirectional connections */
     public FSM<T> connect(T state1, T state2, double cost, boolean bidirectional){
         stateRouter.addConnection(state1, state2, cost, bidirectional);
         return this;
     }
 
+    /** Connect two states with a bidirectional link */
     public FSM<T> connect(T state1, T state2, double cost){
         connect(state1, state2, cost,true);
         return this;
     }
+
+    public FSM<T> addAutoTransition(T state1, T state2, BooleanSupplier condition){
+        var state = stateMap.get(state1);
+        if(state==null){
+            throw new Error("Initial state not present in known FSM states. Add before setting transitions.");
+        }
+        state.addAutoTransition(state2,condition);
+        return this;
+    }
+
+    public FSM<T> addAutoTransition(T state1, T state2){
+        addAutoTransition(state1,state2,()->true);
+        return this;
+    }
+
+
 
 
     /** Container for state data.
@@ -181,7 +204,13 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     public static class FSMState<T extends Enum<T>>{
         public Supplier<Command> commandSupplier = ()->new InstantCommand();
         public BooleanSupplier exitCondition=()->false;
-        T name;
+        public T name;
+
+        public class AutoTransition<T>{
+            public BooleanSupplier condition;
+            public T destination;
+        }
+        public ArrayList<AutoTransition<T>> autotransitions = new ArrayList<>();
 
         /**
          * Provide a state with name, command, and exit conditions.
@@ -195,28 +224,33 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             this.commandSupplier = commandSupplier;
             this.exitCondition = exitCondition;
         }
+
+        public void addAutoTransition(T destination, BooleanSupplier condition){
+            var t = new AutoTransition<T>();
+            t.destination = destination;
+            t.condition = condition;
+            autotransitions.add(t);
+        }
     }
 
     //TODO: Missing useful items
     // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
     // Auto-transition to state when executed as target state and done 
+    //  -> Give Booleansupplier+node, if goal node, check conditions and auto-transition
     //"distance" function for the FSM to attempt state recovery
     //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
 
-    //Have the path tracker take <T enum, N node> and then do a thin wrapper to convert N to an internal type.
-    // Then it can have an interface for changing strategies, and return a list of N without having to 
-    // care about's actual implementation
+    // add state builder of addState(id,command,transitionTo)) to allow for 
+    //   sequences that just end normally to transition without complex workarounds
+
 
     @Override
     public void initSendable(SendableBuilder builder) {
-        Supplier<T> goalState=()->{
-            if(stateMap.isEmpty())return activeState.name;
-            return statePath.peek();
-        };
-
         builder.addBooleanProperty("Goal Complete", isAtGoalState, null);
         builder.addStringProperty("Current State", activeState.name::toString, null);
-        builder.addStringProperty("Goal State", goalState.get()::toString, null);
+        // builder.addStringProperty("Goal State", ()->
+        //     stateMap.isEmpty() ? activeState.name.toString() : statePath.peek().toString()
+        //     , null);
         builder.addBooleanProperty("running", ()->this.running, null);
     }
 
