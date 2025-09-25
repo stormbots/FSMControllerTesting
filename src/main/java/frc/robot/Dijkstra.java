@@ -3,11 +3,13 @@ package frc.robot;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Stack;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 // This impliments the basic Dijkstra algorithm as defined on Wikipedia. 
 
@@ -68,28 +70,32 @@ public class Dijkstra<T extends Enum<T>>{
 
     }
 
+    public Logger log = Logger.getAnonymousLogger();
     HashMap<T,Vertex> graph= new HashMap<>();
     ArrayList<Vertex> unvisited = new ArrayList<>();
 
+    public Dijkstra(){
+        // log.setLevel(Level.WARNING);
+        // log.addHandler(new ConsoleHandler());
+        // log.setLevel(Level.ALL);
+    }
+
     public void addNode(T name){
+        log.config("Adding node " + name);
         graph.put(name, new Vertex(name));
     }
     public void addConnection(T a, T b, double cost,boolean bidirectional){
+        log.config("Adding connection "+a+" "+b);
         graph.get(a).connect(graph.get(b),cost);
         if(bidirectional) addConnection(b,a,cost,false);
     }
 
     public Deque<T> computeCosts(T start, T end){
-        System.out.println("---------------------------------------");
-        System.out.print("NEW PATH GEN: ");
-        System.out.print(start);
-        System.out.print(" --> ");
-        System.out.print(end);
-        System.out.println();
+        log.fine("Calculating costs for transition "+start+"to"+end);
 
         //Reset costs
         graph.forEach((t,node)->{
-            node.cost=999;
+            node.cost=9999;
             node.previous=null;
             unvisited.add(node);
         });
@@ -103,12 +109,9 @@ public class Dijkstra<T extends Enum<T>>{
                 var v=uv.b;
 
                 if(unvisited.contains(v)==false)continue;
-                // System.out.println("checking "+uv);
 
                 var tempDistance = u.cost+uv.weight;
-                // if(tempDistance>=1000){
-                //     System.out.println("Err, started at wrong element");
-                // }
+
                 if(tempDistance < v.cost){
                     v.cost= tempDistance;
                     v.previous = u;
@@ -120,7 +123,6 @@ public class Dijkstra<T extends Enum<T>>{
     }
 
     private Deque<T> computePath(T start, T end){
-        //Consider ring buffer and unshift? IDK, stack works for me.
         var path = new ArrayDeque<T>();
         var last = graph.get(end);
         path.add(last.tag);
@@ -135,10 +137,8 @@ public class Dijkstra<T extends Enum<T>>{
             // path.add(last.tag);
             path.addFirst(last.tag);
         }
-        System.out.print("Path! ");
-        System.out.println(start+"-->"+end);
-        path.forEach((e)->System.out.print(e+" -> ")); 
-        System.out.println();
+        
+        log.fine("Computed path "+path.toString());
 
         return path;
     }

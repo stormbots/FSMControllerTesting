@@ -3,13 +3,17 @@ package frc.robot.FSM;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -28,6 +32,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     Dijkstra<T> stateRouter = new Dijkstra<>();
     Deque<T> statePath=new ArrayDeque<>();
 
+    /** This exists to efficiently convert Strings back to state names */
+    private Map<String,Enum<T>> stringMap = new HashMap<>();
+
+
     public Trigger isAtGoalState=new Trigger(()->
         statePath.isEmpty() && this.activeState!=null && this.activeState.exitCondition.getAsBoolean()
     );
@@ -43,6 +51,19 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             .beforeStarting(()->this.running=true)
             .finallyDo(()->this.running=false)
         );
+
+        SendableChooser<T> chooser = new SendableChooser<>();
+        chooser.setDefaultOption(initialState.toString(), initialState);
+
+        System.out.println("Building string map");
+        for(var s: initialState.getClass().getEnumConstants()){
+            System.out.println(s);
+            stringMap.put(s.toString(), (T)s);
+            chooser.addOption(s.toString(), (T)s);
+        }
+        System.out.println(stringMap);
+        SmartDashboard.putData(this.toString()+"/chooser",chooser);
+
     }
 
 
@@ -231,7 +252,16 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             t.condition = condition;
             autotransitions.add(t);
         }
+        
     }
+
+    @Override
+    public void initSendable(SendableBuilder builder) {
+        builder.addBooleanProperty("Goal Complete", isAtGoalState, null);
+        builder.addStringProperty("Current State", activeState.name::toString, null);
+        builder.addBooleanProperty("running", ()->this.running, null);
+    }
+
 
     //TODO: Missing useful items
     // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
@@ -243,15 +273,6 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     // add state builder of addState(id,command,transitionTo)) to allow for 
     //   sequences that just end normally to transition without complex workarounds
 
-
-    @Override
-    public void initSendable(SendableBuilder builder) {
-        builder.addBooleanProperty("Goal Complete", isAtGoalState, null);
-        builder.addStringProperty("Current State", activeState.name::toString, null);
-        // builder.addStringProperty("Goal State", ()->
-        //     stateMap.isEmpty() ? activeState.name.toString() : statePath.peek().toString()
-        //     , null);
-        builder.addBooleanProperty("running", ()->this.running, null);
-    }
+    //Optional config to ignore enable/disable when scheduling
 
 }

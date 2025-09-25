@@ -14,7 +14,10 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.FSM.FSM;
+import frc.robot.subsystems.CyclingFSM;
+import frc.robot.subsystems.IntakeFSM;
 import frc.robot.subsystems.Arm.Arm;
+import frc.robot.subsystems.CyclingFSM.States;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
 
@@ -34,6 +37,7 @@ public class RobotContainer {
 
   MechView mechanism = new MechView(arm,wrist,rollers);
 
+  CyclingFSM cyclingFSM = new CyclingFSM();
 
   public enum BotState{
     Stow,
@@ -47,11 +51,9 @@ public class RobotContainer {
   public RobotContainer() {
     DriverStation.silenceJoystickConnectionWarning(true);
     initStates();
+    SmartDashboard.putData("fsmsendable",fsm);
     // Configure the trigger bindings
     configureBindings();
-
-    // djsetup();
-    
   }
 
   private void configureBindings() {
@@ -61,7 +63,11 @@ public class RobotContainer {
     driver.x().whileTrue(fsm.setRun(BotState.IntakeStation));
     driver.a().whileTrue(fsm.setRun(BotState.Stow));
 
+    //TODO cleaner API for this would be good.
+    cyclingFSM.fsm.addAutoTransition(States.a, States.b, driver.a());
   }
+
+  // IntakeFSM intakefsm = new IntakeFSM();
 
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.
@@ -69,6 +75,7 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    // if(true)return intakefsm.testIntakeSequences();
 
     return new SequentialCommandGroup(
       Commands.print("AUTO initial stow"),
