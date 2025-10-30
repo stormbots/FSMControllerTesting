@@ -42,10 +42,16 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      */
     private final boolean TRANSITION_BACKTRACKING = true;
 
+    /** Generic test for reaching the intended goal state */
     public Trigger isAtGoalState=new Trigger(()->
         statePath.isEmpty() && this.activeState!=null && this.activeState.exitCondition.getAsBoolean()
     );
 
+    /**
+     * Create a new Finite State Machine. 
+     * Will begin in the provided initial state
+     * @param initialState
+     */
     public FSM(T initialState){
         //This is just to prevent potential null references throughout the code.
         //Adding the state definition later will overwrite this. 
@@ -161,13 +167,14 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
 
     /** Set the target state and return, ignoring when or how it completes.
-     * Useful for setting up parallel sequencing without having to use deadlines 
+     * Useful for setting up parallel sequencing without having to use deadlines
+     * when combined with {@link #await()}.
     */
     public Command setAsync(T state){
         return setRun(state).until(()->true);
     }
 
-    /** Wait for the currently set goal state to be reached. Pairs well with setAsync. */
+    /** Wait for the currently set goal state to be reached. Pairs well with {@link #setAsync(Enum)}. */
     public Command await(){
         return Commands.waitUntil(isAtGoalState);
     }
@@ -184,11 +191,20 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
 
     /**
-     * Add an externally defined FSMState directly. You probably do not want this version.
+     * Add an externally defined FSMState directly.
+     * You likely want the {@link #addState(Enum, Supplier, BooleanSupplier)} version
      * @param state
      * @return
      */
     public FSM<T> addState(FSMState<T> state){
+        if(stateMap.containsKey(state.name)){
+            var str = String.format("Duplicate definition of state %s",
+            state.name.toString()
+        );
+        throw new Error(str);
+
+        }
+
         if(state.name==initialState) activeState = state;
         stateMap.put(state.name, state);
         stateRouter.addNode(state.name);
@@ -197,13 +213,21 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     /**
      * Add a new State, containing the minimial state actions. 
-     * Generally, provided commands should not end directly, but instead provide a completionSupplier
-     * which will handle transition logic. 
-     * 
-     * The CompletionSupplier should indicate that the state's primary work is complete. When the state is 
-     * an intermediate state, this indicates to the manager that the next state can be transitioned to.
+     * <br/>
+     * States represent the actions the robot should be undertaking at the point in time, 
+     * using the provided Commands. 
+     * Generally, provided commands should not, but instead rely on the completionSupplier
+     * to terminate the command as needed.
+     * <br>/
+     * The CompletionSupplier should indicate that the state's primary work is complete. 
+     * When the state is an intermediate state during a longer transition, the CompletionSupplier
+     * reporting true means it can progress to the next step. 
+     * <br/>
      * When a goal or target state is complete, FSM based commands like {@link #setWait(Enum)}
-     * will terminate, allowing progression of sequences. 
+     * will terminate, allowing progression of sequences.
+     * <br/>
+     * Automatic transitions provided by {@link #addAutoTransition(Enum, Enum, BooleanSupplier)} 
+     * will be checked when the state's command ends or when it's completion status is true.
      * 
      * @param name
      * @param commandSupplier

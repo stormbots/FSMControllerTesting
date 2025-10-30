@@ -26,7 +26,7 @@ public class IntakeFSM extends SubsystemBase {
     CoralLoaded,
     CoralScore,
   }
-  FSM<IntakeState> fsm = new FSM<>(IntakeState.CoralAlignReverse); //This does stuff by default :(
+  FSM<IntakeState> fsm = new FSM<>(IntakeState.Unloaded); 
   
   SparkMax rollers = new SparkMax(21, MotorType.kBrushless);
   private boolean coralSensor=false;
@@ -64,16 +64,20 @@ public class IntakeFSM extends SubsystemBase {
       ()->coralSensor==false
     );
 
-    //Normal scoring flow
-    fsm.addConnection(IntakeState.Unloaded, IntakeState.CoralLoading, 1,false);
-    fsm.addConnection(IntakeState.CoralLoading, IntakeState.CoralAlignReverse, 1,false);
-    fsm.addConnection(IntakeState.CoralAlignReverse, IntakeState.CoralAlignForward,1,false);
-    fsm.addConnection(IntakeState.CoralAlignForward, IntakeState.CoralLoaded, 1,false);
-    fsm.addConnection(IntakeState.CoralLoaded, IntakeState.CoralScore, 1,false);
-    fsm.addConnection(IntakeState.CoralScore, IntakeState.Unloaded, 1,false);
+    //Normal scoring flow: A directional state transition sequence
+    fsm.addDirectionalConnection(
+      IntakeState.Unloaded,
+      IntakeState.CoralLoading,
+      IntakeState.CoralAlignReverse,
+      IntakeState.CoralAlignForward,
+      IntakeState.CoralLoaded,
+      IntakeState.CoralScore,
+      IntakeState.Unloaded
+    );
+
 
     //Cancelled score attempt
-    fsm.addConnection(IntakeState.CoralScore, IntakeState.CoralAlignReverse, 1,false);
+    fsm.addDirectionalConnection(IntakeState.CoralScore, IntakeState.CoralAlignReverse);
 
     //Configure the automatic transitions
     // fsm.addAutoTransition(IntakeState.CoralScore, IntakeState.Unloaded, ()->coralSensor==false);

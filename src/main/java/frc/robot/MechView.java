@@ -48,6 +48,7 @@ public class MechView {
     MechanismLigament2d chassisFront = chassisTop.append(new MechanismLigament2d("ChassisBack", 4, -90));
     MechanismLigament2d wristBackstop = arm.append(new MechanismLigament2d("WristBackstop", 2, 0));
 
+    MechanismLigament2d coral = wrist.append(new MechanismLigament2d("Coral", 6, 0));
 
     public MechView( 
       Arm armSystem,
@@ -84,6 +85,7 @@ public class MechView {
       chassisBack.setLineWeight(1);
       wristBackstop.setLineWeight(2);
 
+
       SmartDashboard.putData("mechanism/arm", mech);
       new RunCommand(this::update).ignoringDisable(true).schedule();
       
@@ -96,6 +98,9 @@ public class MechView {
       rollers.setAngle(rollersSystem.getAngle().in(Degrees));
       rollersR.setAngle(rollersSystem.getAngle().in(Degrees));
 
+      coral.setColor(new Color8Bit(Color.kWhite));
+      coral.setLineWeight(6);
+      coral.setLength(rollersSystem.isHoldingCoral.getAsBoolean() ? 6 : 0);
 
       wristBackstop.setAngle(wristSystem.getAngle().plus(Degree.of(-90)).in(Degree));
       

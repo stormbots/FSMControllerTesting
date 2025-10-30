@@ -18,8 +18,11 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.PrintCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.SelectCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
@@ -52,18 +55,34 @@ public class Rollers extends SubsystemBase {
   }
 
   public Command intake(){
-    return new RunCommand(()->velocity = RPM.of(10),this)
-    .withTimeout(1.5)
-    .finallyDo((e)->this.hasCoral=true);
+    return Commands.parallel(
+      run(()->velocity = RPM.of(10)),
+      //Assume if we ran it for a few seconds we probably loaded something
+      Commands.waitSeconds(2).finallyDo(()->hasCoral=true)
+    );
   }
 
   public Command eject(){
-    return new RunCommand(()->velocity = RPM.of(-10),this)
-    .withTimeout(1)
-    .finallyDo((e)->this.hasCoral=false)
-    ;
+    return Commands.parallel(
+      run(()->velocity = RPM.of(10)),
+      //Assume if we ran it for several seconds we probably unloaded something
+      Commands.waitSeconds(2).finallyDo(()->hasCoral=false)
+    );
   }
 
   public Trigger isHoldingCoral = new Trigger(()->hasCoral);
 
+  public Command giveCoral(){
+    return Commands.sequence(
+      new InstantCommand(()->hasCoral=true),
+      new PrintCommand("giving bot coral")
+    );
+  }
+
+  public Command takeCoral(){
+    return Commands.sequence(
+      new InstantCommand(()->hasCoral=false),
+      new PrintCommand("taking coral")
+    );
+  }
 }

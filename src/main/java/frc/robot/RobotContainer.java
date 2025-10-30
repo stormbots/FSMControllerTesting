@@ -37,7 +37,12 @@ public class RobotContainer {
 
   MechView mechanism = new MechView(arm,wrist,rollers);
 
+  //This is a demo FSM that just cycles between various states. 
+  // Subsystem FSMs might wind up looking similar
   // CyclingFSM cyclingFSM = new CyclingFSM();
+
+  //Another hastily put together demo subsystem relying heavily on automatic transitions
+  //IntakeFSM intakeFSM = new IntakeFSM();
 
   public enum BotState{
     Home,
@@ -65,18 +70,16 @@ public class RobotContainer {
     driver.x().whileTrue(fsm.setRun(BotState.IntakeStation));
     driver.a().whileTrue(fsm.setRun(BotState.Stow));
 
-    //Tap to "prepare", and once you're there you can hold it to place it
+    //Hold to score, tap/release to remain at the prepration pose
     driver.y()
-    .onTrue(fsm.setRun(BotState.L1_Score))
+    .whileTrue(fsm.setRun(BotState.L1_Score))
     .onFalse(fsm.setAsync(BotState.L1))
     ;
 
-
-    //TODO cleaner API for this would be good.
-    // cyclingFSM.fsm.addAutoTransition(States.a, States.b, driver.a());
+    //Allow arbitrary tinkering of the coral status to muck with the states
+    driver.leftBumper().onTrue(rollers.giveCoral());
+    driver.rightBumper().onTrue(rollers.takeCoral());
   }
-
-  // IntakeFSM intakefsm = new IntakeFSM();
 
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.
@@ -84,11 +87,10 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    // if(true)return intakefsm.testIntakeSequences();
 
     return new SequentialCommandGroup(
       Commands.print("AUTO initial stow"),
-      // fsm.forceState(BotState.Stow),
+      fsm.forceState(BotState.Home),
       fsm.await().withTimeout(3),
 
       Commands.print("AUTO Station"),
@@ -171,12 +173,32 @@ public class RobotContainer {
           rollers.isHoldingCoral
       );
 
-      fsm.addConnection(BotState.Stow, BotState.L1);
+      //Connect using a couple hub nodes
       fsm.addConnectionHub(BotState.Stow, BotState.IntakeStation, BotState.L1, BotState.IntakeFloor);
-      // fsm.addConnection(BotState.IntakeFloor,BotState.L1);
-      fsm.addConnection(BotState.L1,BotState.L1_Score);
+      fsm.addConnectionHub(BotState.L1,BotState.IntakeStation,BotState.IntakeFloor,BotState.L1_Score);
+      // Connect some individual connections instead
+      fsm.addConnection(BotState.L1, BotState.L1_Score);
+      fsm.addConnection(BotState.L1, BotState.IntakeStation);
+      fsm.addConnection(BotState.L1, BotState.Stow);
       
-      // fsm.connect(BotState.IntakeFloor, BotState.L1, 1,false);
+      //Set a unidirectional connection from our homing process
+      fsm.addDirectionalConnection(BotState.Home,BotState.Stow);
+      fsm.addAutoTransition(BotState.Home, BotState.Stow,()->true);
+
+      //Connect using relevant paths; Redundant connections will be ignored, 
+      //but intersections will be used in routing.
+      // fsm.addConnection(BotState.Stow, BotState.L1, BotState.L1_Score); 
+      // fsm.addConnection(BotState.IntakeStation, BotState.Stow, BotState.L1, BotState.L1_Score); 
+      // fsm.addConnection(BotState.IntakeFloor, BotState.L1);
+
+      // Automatically back out of some handling states when we're done there
+      fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate().debounce(0.3));
+      fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral);
+      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral);
+      //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
+      //between the two states!
+
+
   }
 
 
