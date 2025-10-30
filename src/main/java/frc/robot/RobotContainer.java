@@ -37,16 +37,17 @@ public class RobotContainer {
 
   MechView mechanism = new MechView(arm,wrist,rollers);
 
-  CyclingFSM cyclingFSM = new CyclingFSM();
+  // CyclingFSM cyclingFSM = new CyclingFSM();
 
   public enum BotState{
+    Home,
     Stow,
     L1,
     L1_Score,
     IntakeFloor,
     IntakeStation
   }
-  FSM<BotState> fsm = new FSM<>(BotState.Stow);
+  FSM<BotState> fsm = new FSM<>(BotState.Home);
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -59,14 +60,17 @@ public class RobotContainer {
 
   private void configureBindings() {
 
-    driver.y().whileTrue(fsm.setRun(BotState.L1));
+    // driver.y().whileTrue(fsm.setRun(BotState.L1));
     driver.b().whileTrue(fsm.setRun(BotState.IntakeFloor));
     driver.x().whileTrue(fsm.setRun(BotState.IntakeStation));
     driver.a().whileTrue(fsm.setRun(BotState.Stow));
 
-    driver.rightBumper()
-    .and(()->fsm.isAtState(BotState.L1))
-    .whileTrue(fsm.setRun(BotState.L1_Score));
+    //Tap to "prepare", and once you're there you can hold it to place it
+    driver.y()
+    .onTrue(fsm.setRun(BotState.L1_Score))
+    .onFalse(fsm.setAsync(BotState.L1))
+    ;
+
 
     //TODO cleaner API for this would be good.
     // cyclingFSM.fsm.addAutoTransition(States.a, States.b, driver.a());
@@ -117,6 +121,13 @@ public class RobotContainer {
 
 
   public void initStates(){
+      fsm.addState(BotState.Home,
+        ()->new ParallelCommandGroup(
+          //Do our homing process here.
+        ),
+        ()->true
+      );
+
       fsm.addState(BotState.Stow,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),

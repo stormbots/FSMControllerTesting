@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -86,7 +87,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             activeCommand=activeState.commandSupplier.get();
             activeCommand.schedule();
         }
-        else if(activeCommand.isScheduled()==false && activeState.autotransitions.size()>0){
+        else if( 
+            (activeCommand.isScheduled()==false && activeState.autotransitions.size()>0)
+            || (activeCommand.isScheduled() && activeState.exitCondition.getAsBoolean())
+        ){
             //We have automated transition conditions. Check them. 
             for(var transition: activeState.autotransitions){
                 if(transition.condition.getAsBoolean()){
