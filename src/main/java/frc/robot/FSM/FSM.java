@@ -2,6 +2,7 @@ package frc.robot.FSM;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -109,8 +110,14 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     }
 
-    public FSMState<T> getCurrentState(){
-        return activeState;
+    /** Return the tag for the current state */
+    public T getActiveState(){
+        return activeState.name;
+    }
+
+    /** Returns true if the FSM is at the indicated state and the completion supplier is true. */
+    public boolean isAtState(T state){
+        return activeState.name==state && isAtGoalState.getAsBoolean();
     }
 
     /** Set the state and wait for completion. Good for sequencing. */
@@ -159,7 +166,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
 
     /**
-     * Add an externally defined FSMState directly.
+     * Add an externally defined FSMState directly. You probably do not want this version.
      * @param state
      * @return
      */
@@ -191,29 +198,104 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     }
 
-    /** Connect two states, allowing unidirectional connections */
-    public FSM<T> connect(T state1, T state2, double cost, boolean bidirectional){
+    /**
+     * Connect two states, allowing unidirectional connections
+     * @param state1
+     * @param state2
+     * @param cost Must be greater than zero: 1 is a good default.
+     * @param bidirectional
+     * @return
+     */
+    public FSM<T> addConnection(T state1, T state2, double cost, boolean bidirectional){
+        if(cost<=0){
+            var str = String.format("Cost must be greater than zero for transition %s -> %s (given %n)",
+                state1.toString(),state2.toString(),cost
+            );
+            throw new Error(str);
+        }
         stateRouter.addConnection(state1, state2, cost, bidirectional);
         return this;
     }
 
     /** Connect two states with a bidirectional link */
-    public FSM<T> connect(T state1, T state2, double cost){
-        connect(state1, state2, cost,true);
+    public FSM<T> addConnection(T state1, T state2, double cost){
+        addConnection(state1, state2, cost,true);
         return this;
     }
 
-    public FSM<T> addAutoTransition(T state1, T state2, BooleanSupplier condition){
-        var state = stateMap.get(state1);
+    /** Connect two or more states sequences using default costs.
+     * Can be used to define a full sequence in one go.
+     * Connections will be bi-directional.
+     * @param states
+     * @return
+    */
+    public FSM<T> addConnection(T... states){
+        if(states.length<=1){
+            throw new Error("Need two or more connections");
+        }
+        for(int i=1; i<states.length; i++){
+            addConnection(states[i-1],states[i],1);
+        }
+        
+        return this;
+    }
+
+    /** 
+     * Connect multiple states in a using default costs. 
+     * The connections will be uni-directional.
+     * @param states
+     * @return
+     */
+    public FSM<T> addDirectionalConnection(T... states){
+        if(states.length<=1){
+            throw new Error("Need two or more connections");
+        }
+        for(int i=1; i<states.length; i++){
+            addConnection(states[i-1],states[i],1,false);
+        }
+        
+        return this;
+    }
+
+    
+
+    /** Connect one hub state to multiple other states simultaneously. Uses default cost of 1*/
+    public FSM<T> addConnectionHub(T hubState, T... states){
+        if(states.length<1){
+            throw new Error("Need one or more connections");
+        }
+        for(int i=0; i<states.length; i++){
+            addConnection(hubState,states[i],1);
+        }
+        
+        return this;
+    }
+
+
+    /** Automatically transition from one state to another when a condition is met.
+     * This only occours when the fromStates state's completion condition has been met.
+     * (eg, it's at a position or finished it's other task)
+     * @param fromState 
+     * @param toState 
+     * @param condition 
+     * @return
+     */
+    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition){
+        var state = stateMap.get(fromState);
         if(state==null){
             throw new Error("Initial state not present in known FSM states. Add before setting transitions.");
         }
-        state.addAutoTransition(state2,condition);
+        state.addAutoTransition(toState,condition);
         return this;
     }
 
-    public FSM<T> addAutoTransition(T state1, T state2){
-        addAutoTransition(state1,state2,()->true);
+    /** Automatically transition from one state to another once its completion condition has been met.
+     * @param fromState
+     * @param toState
+     * @return
+     */
+    public FSM<T> addAutoTransition(T fromState, T toState){
+        addAutoTransition(fromState,toState,()->true);
         return this;
     }
 
@@ -265,8 +347,6 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     //TODO: Missing useful items
     // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
-    // Auto-transition to state when executed as target state and done 
-    //  -> Give Booleansupplier+node, if goal node, check conditions and auto-transition
     //"distance" function for the FSM to attempt state recovery
     //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
 

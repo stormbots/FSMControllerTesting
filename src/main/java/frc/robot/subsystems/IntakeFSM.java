@@ -65,15 +65,15 @@ public class IntakeFSM extends SubsystemBase {
     );
 
     //Normal scoring flow
-    fsm.connect(IntakeState.Unloaded, IntakeState.CoralLoading, 1,false);
-    fsm.connect(IntakeState.CoralLoading, IntakeState.CoralAlignReverse, 1,false);
-    fsm.connect(IntakeState.CoralAlignReverse, IntakeState.CoralAlignForward,1,false);
-    fsm.connect(IntakeState.CoralAlignForward, IntakeState.CoralLoaded, 1,false);
-    fsm.connect(IntakeState.CoralLoaded, IntakeState.CoralScore, 1,false);
-    fsm.connect(IntakeState.CoralScore, IntakeState.Unloaded, 1,false);
+    fsm.addConnection(IntakeState.Unloaded, IntakeState.CoralLoading, 1,false);
+    fsm.addConnection(IntakeState.CoralLoading, IntakeState.CoralAlignReverse, 1,false);
+    fsm.addConnection(IntakeState.CoralAlignReverse, IntakeState.CoralAlignForward,1,false);
+    fsm.addConnection(IntakeState.CoralAlignForward, IntakeState.CoralLoaded, 1,false);
+    fsm.addConnection(IntakeState.CoralLoaded, IntakeState.CoralScore, 1,false);
+    fsm.addConnection(IntakeState.CoralScore, IntakeState.Unloaded, 1,false);
 
     //Cancelled score attempt
-    fsm.connect(IntakeState.CoralScore, IntakeState.CoralAlignReverse, 1,false);
+    fsm.addConnection(IntakeState.CoralScore, IntakeState.CoralAlignReverse, 1,false);
 
     //Configure the automatic transitions
     // fsm.addAutoTransition(IntakeState.CoralScore, IntakeState.Unloaded, ()->coralSensor==false);
@@ -142,7 +142,7 @@ public class IntakeFSM extends SubsystemBase {
   @Override
   public void periodic() {
     // This method will be called once per scheduler run
-    SmartDashboard.putString("intakefsm/current", fsm.getCurrentState().name.toString());
+    SmartDashboard.putString("intakefsm/current", fsm.getActiveState().toString());
   }
 
   public Command testIntakeSequences(){

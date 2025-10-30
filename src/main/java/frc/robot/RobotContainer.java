@@ -42,6 +42,7 @@ public class RobotContainer {
   public enum BotState{
     Stow,
     L1,
+    L1_Score,
     IntakeFloor,
     IntakeStation
   }
@@ -63,8 +64,12 @@ public class RobotContainer {
     driver.x().whileTrue(fsm.setRun(BotState.IntakeStation));
     driver.a().whileTrue(fsm.setRun(BotState.Stow));
 
+    driver.rightBumper()
+    .and(()->fsm.isAtState(BotState.L1))
+    .whileTrue(fsm.setRun(BotState.L1_Score));
+
     //TODO cleaner API for this would be good.
-    cyclingFSM.fsm.addAutoTransition(States.a, States.b, driver.a());
+    // cyclingFSM.fsm.addAutoTransition(States.a, States.b, driver.a());
   }
 
   // IntakeFSM intakefsm = new IntakeFSM();
@@ -87,12 +92,18 @@ public class RobotContainer {
 
       Commands.print("AUTO L1"),
       fsm.setWait(BotState.L1),
+      
+      Commands.print("DRIVING"),
+      new WaitCommand(0.5),
+
+      Commands.print("AUTO L1"),
+      fsm.setWait(BotState.L1_Score),
 
       Commands.print("AUTO Floor"),
       fsm.setWait(BotState.IntakeFloor),
 
       Commands.print("AUTO L1 Again"),
-      fsm.setWait(BotState.L1),
+      fsm.setWait(BotState.L1_Score),
 
       Commands.print("AUTO Back  to stow"),
       fsm.setWait(BotState.Stow),
@@ -109,8 +120,8 @@ public class RobotContainer {
       fsm.addState(BotState.Stow,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
-              wrist.setAngle(()->120),
-              rollers.stop()
+              wrist.setAngle(()->120)
+              // rollers.stop() //Left alone, so it runs defaultCommand
           ),
           arm.isAtTarget.and(wrist.isAtTarget)
       );
@@ -118,11 +129,15 @@ public class RobotContainer {
       fsm.addState(BotState.L1,
         ()->new ParallelCommandGroup(
               arm.setAngle(()->45),
-              wrist.setAngle(()->0),
-              rollers.stop()
-          ).until(arm.isAtTarget.and(wrist.isAtTarget))
-          .andThen(rollers.eject()),
-          rollers.isHoldingCoral.negate()
+              wrist.setAngle(()->0)
+              // rollers.stop() //Left with defaultCommand
+          ),
+          arm.isAtTarget.and(wrist.isAtTarget).debounce(0.1)
+      );
+
+      fsm.addState(BotState.L1_Score,
+        ()->rollers.eject(),
+        rollers.isHoldingCoral.negate().debounce(0.2)
       );
 
       fsm.addState( BotState.IntakeStation,
@@ -138,16 +153,18 @@ public class RobotContainer {
       fsm.addState( BotState.IntakeFloor,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
-              wrist.setAngle(()->-20),
-              rollers.stop()
+              wrist.setAngle(()->-20)//,
+              // rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
           rollers.isHoldingCoral
       );
 
-      fsm.connect(BotState.Stow, BotState.IntakeStation, 1.0);
-      fsm.connect(BotState.Stow, BotState.L1, 1.0);
-      fsm.connect(BotState.Stow, BotState.IntakeFloor, 1.0); 
+      fsm.addConnection(BotState.Stow, BotState.L1);
+      fsm.addConnectionHub(BotState.Stow, BotState.IntakeStation, BotState.L1, BotState.IntakeFloor);
+      // fsm.addConnection(BotState.IntakeFloor,BotState.L1);
+      fsm.addConnection(BotState.L1,BotState.L1_Score);
+      
       // fsm.connect(BotState.IntakeFloor, BotState.L1, 1,false);
   }
 

@@ -29,16 +29,16 @@ public class CyclingFSM extends SubsystemBase {
     fsm.addState(States.even, ()->printy("even"), ()->true);
     fsm.addState(States.odd, ()->printy("odd"), ()->true);
 
-    fsm.connect(States.a, States.b,1,false);
-    fsm.connect(States.b, States.c,1,false);
-    fsm.connect(States.c, States.d,1,false);
-    fsm.connect(States.d, States.even,1,false);
-    fsm.connect(States.d, States.odd,1,false);
-    fsm.connect(States.even, States.a,1,false);
-    fsm.connect(States.odd, States.a,1,false);
+    fsm.addConnection(States.a, States.b,1,false);
+    fsm.addConnection(States.b, States.c,1,false);
+    fsm.addConnection(States.c, States.d,1,false);
+    fsm.addConnection(States.d, States.even,1,false);
+    fsm.addConnection(States.d, States.odd,1,false);
+    fsm.addConnection(States.even, States.a,1,false);
+    fsm.addConnection(States.odd, States.a,1,false);
 
     fsm.addAutoTransition(States.a, States.b);
-    // fsm.addAutoTransition(States.b, States.c);
+    fsm.addAutoTransition(States.b, States.c);
     fsm.addAutoTransition(States.c, States.d);
     fsm.addAutoTransition(States.d, States.even, ()->(int)Timer.getFPGATimestamp()%2==0);
     fsm.addAutoTransition(States.d, States.odd, ()->(int)Timer.getFPGATimestamp()%2==1);
@@ -66,7 +66,7 @@ public class CyclingFSM extends SubsystemBase {
   @Override
   public void periodic() {
     // This method will be called once per scheduler run
-    SmartDashboard.putString("cycle/current", fsm.getCurrentState().name.toString());
+    SmartDashboard.putString("cycle/current", fsm.getActiveState().toString());
     SmartDashboard.putBoolean("cycle/done?", fsm.activeCommand.isScheduled());
   }
 }

@@ -12,7 +12,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 // This impliments the basic Dijkstra algorithm as defined on Wikipedia. 
-
 //     1  function Dijkstra(Graph, source):
 //     2     
 //     3      for each vertex v in Graph.Vertices:
@@ -40,9 +39,18 @@ public class Dijkstra<T extends Enum<T>>{
         double cost;
         Vertex previous=null;
         ArrayList<Edge> edges=new ArrayList<>();
-        Vertex(T tag){this.tag=tag;}
+
+        Vertex(T tag){
+            this.tag=tag;
+        }
+
         public void connect(Vertex other, double weight){
-           edges.add(new Edge(this, other, weight));
+            var edge=new Edge(this, other, weight);
+            //Avoid adding duplicated connections
+            for(Edge e: edges){                 
+                if(e.b.tag==other.tag) return;
+            }
+            edges.add(edge);
         }
 
         public String toString(){
@@ -53,7 +61,6 @@ public class Dijkstra<T extends Enum<T>>{
         public int compareTo(Vertex o) {
             return Double.compare(this.cost,o.cost);
         }
-
     }
 
     public class Edge implements Comparable<Edge>{
@@ -64,6 +71,7 @@ public class Dijkstra<T extends Enum<T>>{
         public int compareTo(Edge o) {
             return Double.compare(this.weight,o.weight);
         }
+
         public String toString(){
             return String.format("E(%s --(%f)-> %s)",a.toString(),weight,b.toString());
         }

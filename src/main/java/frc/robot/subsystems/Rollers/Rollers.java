@@ -31,7 +31,9 @@ public class Rollers extends SubsystemBase {
   boolean hasCoral = false;
 
   /** Creates a new Rollers. */
-  public Rollers() {}
+  public Rollers() {
+    setDefaultCommand(stop());
+  }
 
   @Override
   public void periodic() {
