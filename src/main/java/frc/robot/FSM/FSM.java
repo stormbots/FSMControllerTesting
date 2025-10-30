@@ -25,7 +25,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     HashMap<T,FSMState<T>> stateMap = new HashMap<>();
     FSMState<T> activeState;
-    // FSMState<T> goalState;
+    FSMState<T> priorState;
     public Command activeCommand = Commands.none();
     private boolean running=false;
     private T initialState;
@@ -36,6 +36,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     /** This exists to efficiently convert Strings back to state names */
     private Map<String,Enum<T>> stringMap = new HashMap<>();
 
+    /** Allow routing to backtrack along edge transitions, 
+     * allowing drivers to more easily "undo" longer motions
+     */
+    private final boolean TRANSITION_BACKTRACKING = true;
 
     public Trigger isAtGoalState=new Trigger(()->
         statePath.isEmpty() && this.activeState!=null && this.activeState.exitCondition.getAsBoolean()
@@ -46,6 +50,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         //Adding the state definition later will overwrite this. 
         this.initialState=initialState;
         this.activeState=new FSMState<T>(initialState, Commands::none, ()->false);
+        this.priorState=activeState;
 
         new Trigger(DriverStation::isEnabled)
         .whileTrue(Commands.run(this::manageStates)
@@ -76,6 +81,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         if(activeState.exitCondition.getAsBoolean() && statePath.size()>0){
             System.out.println("Updating to "+statePath.peek());
             activeCommand.cancel();
+            priorState=activeState;
             activeState = stateMap.get(statePath.poll());
             activeCommand=activeState.commandSupplier.get();
             activeCommand.schedule();
@@ -86,6 +92,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 if(transition.condition.getAsBoolean()){
                     System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
                     activeCommand.cancel();//redundant but nonissue
+                    priorState = activeState;
                     activeState = stateMap.get(transition.destination);
                     activeCommand=activeState.commandSupplier.get();
                     activeCommand.schedule();
@@ -132,7 +139,14 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
         return Commands.startRun(
             ()->{
-                this.statePath = stateRouter.computeCosts(activeState.name, state);
+                var statePath=stateRouter.computeCosts(activeState.name, state);
+                var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround.
+                //If we're on the destination transition, backtrack along the transition
+                if(TRANSITION_BACKTRACKING && statePath.size()>=2 && eewgross.get(1)==priorState.name){
+                    statePath.poll();
+                }
+
+                this.statePath = statePath; 
                 this.activeCommand.cancel();
                 this.activeState = stateMap.get(statePath.peek());
                 this.activeCommand = activeState.commandSupplier.get();
