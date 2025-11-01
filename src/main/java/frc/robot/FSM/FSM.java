@@ -2,9 +2,7 @@ package frc.robot.FSM;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Deque;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +25,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     HashMap<T,FSMState<T>> stateMap = new HashMap<>();
     FSMState<T> activeState;
     FSMState<T> priorState;
-    public Command activeCommand = Commands.none();
+    public Command activeCommand = Commands.idle();
     private boolean running=false;
     private T initialState;
 
@@ -81,6 +79,9 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
 
     private void reschedule(T state){
+        //Avoid re-scheduling running commands
+        if(activeState.name==state && activeCommand.isScheduled()) return;
+
         System.out.println("Rescheduling to "+state);
         activeCommand.cancel();
         priorState=activeState;
@@ -89,51 +90,113 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         activeCommand.schedule();
     }
 
-    public void manageStates(){
-        // SmartDashboard.putBoolean("fsm/atgoalstate",isAtGoalState.getAsBoolean());
-
-        //Walk through our state queue
-        //We only need to care about exit condition if we have more states.
-        if(activeState.exitCondition.getAsBoolean() && statePath.size()>0){
-            reschedule(statePath.poll());
-        }
-        else if(activeCommand.isScheduled()==false && activeState.autotransitions.size()>0){
-            //Command exits and has auto-transitions
-            //TODO: Verify sugar for creating auto-transitioning commands. If there's no further quirks, 
-            //  this likely does not need to be a seperated branch/check with  special handling
-            //  Nominally, 
-            for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean() && (transition.requiresCompletion==false || activeState.exitCondition.getAsBoolean()) ){
-                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                    reschedule(transition.destination);
-                    break; //Don't check more conditions; First come first served.
-                }
-            }
-            //No valid auto-transitions.? Do we need to permanently schedule? This else if checking isn't helping
-        }
-        else if(activeCommand.isScheduled() && activeState.exitCondition.getAsBoolean()){
-            //command does *not* exit, so check it's automatic transitions
-            for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean() && (transition.requiresCompletion==false || activeState.exitCondition.getAsBoolean())){
-                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                    reschedule(transition.destination);
-                    break; //Don't check more conditions; First come first served.
-                }
-            }
-        }
-        else if(activeCommand.isScheduled()==false){
-            //Goal commands generally shouldn't exit without some automated transition defined.
-            //In this case, just reschedule it 
-            System.out.println("Permascheduling "+activeState.name);
-            //Otherwise this generally shouldn't happen. Reschedule it without exit conditions
-            activeCommand = activeState.commandSupplier.get().repeatedly();
-            activeCommand.schedule();
-        }
-
-        //NOTE TO SELF: command.isFinished() often gets broken by wrapper commands,
-        //causing transition failures. Checking isScheduled() works as expected.
-
+    public enum InternalState{
+        Traversing,
+        ApproachingGoal,
+        AtGoal,
+        Unscheduled,
+        Forced,
+        Updating
     }
+    private InternalState internalState=InternalState.Unscheduled;
+    public void manageStates(){
+        /*IMPLEMENTATION NOTE:
+        * This switch has several intentional fallthroughs to enable a single bot cycle
+        * to make multiple internal state transitions at once. Because this is running
+        * on a potato, has a real-world time savings of 20ms per fallthrough, meaning
+        * we save up to 0.1s for certain interactions.
+        */
+        
+        switch(internalState){
+        case Traversing:
+            if(activeState.exitCondition.getAsBoolean()){
+                internalState=InternalState.Updating;
+                //intentional fallthrough to next case
+            }else{
+                break;
+            }
+
+        case Updating:
+            //We have more states!
+            if(statePath.size()>1){
+                reschedule(statePath.poll());
+                internalState=InternalState.Traversing;
+                break;
+            }else if(statePath.size()>0){
+                reschedule(statePath.poll());
+                internalState=InternalState.ApproachingGoal;
+                // break;
+                //fallthrough to next
+            }else{
+                internalState = InternalState.ApproachingGoal;
+                //fallthrough to next
+            }
+
+        case ApproachingGoal:
+            for(var transition: activeState.autotransitions){
+                if(transition.condition.getAsBoolean() && transition.requiresCompletion==false){
+                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
+                    internalState=InternalState.Updating;
+                    updatePath(activeState.name, transition.destination, priorState.name, false);
+                    reschedule(statePath.poll());
+                    internalState = InternalState.Updating;
+                    // reschedule(transition.destination);
+                    break; //from loop //Don't check more conditions; First come first served.
+                }
+            }
+            
+            if(activeState.exitCondition.getAsBoolean()){
+                internalState = InternalState.AtGoal;
+                //intentional fallthrough
+            }else{
+                break;
+            }
+
+        case AtGoal:
+            for(var transition: activeState.autotransitions){
+                if(transition.condition.getAsBoolean()){
+                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
+                    updatePath(activeState.name, transition.destination, priorState.name, false);
+                    reschedule(statePath.poll());
+                    internalState=InternalState.Updating;
+                    break; //from loop //Don't check more conditions; First come first served.
+                }
+            }
+
+            if(activeCommand.isScheduled()==true){
+                //Expected case: Nothing to do
+                break;
+            }else{
+                //Unexpected case! Fall through to handling of this scenario
+                internalState=InternalState.Unscheduled;
+            }
+            break;
+
+        case Unscheduled:
+            //We generally shouldn't be here, and this state is ill defined.
+            //An Auto Transition should have fired, or we should have a command that is still running
+            //In this case, re-schedule it with a .forever()
+
+            //Blocked out for now because for whatever reason this state *does* seem to trigger
+
+            System.err.printf(
+                "State command %s unexpectedly exited without transition. Rescheduling indefinitely.\n",
+                activeState.name.toString()
+            );
+            reschedule(activeState.name);
+            // activeState.commandSupplier.get().repeatedly().schedule();
+
+            internalState = InternalState.Updating;
+            break;
+
+        case Forced:
+            //We go to the current state, no questions asked or other conditions considered.
+            //We will exit this state when something reschedules it normally.
+            activeState.commandSupplier.get().schedule();
+        }
+        SmartDashboard.putString("fsmInternalState", internalState.toString());
+    }
+
 
     /** Return the tag for the current state */
     public T getActiveState(){
@@ -148,6 +211,22 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     /** Set the state and wait for completion. Good for sequencing. */
     public Command setWait(T state){
         return setRun(state).until(isAtGoalState);
+    }
+
+
+    public void updatePath(T start,T goal, T previousState, boolean enableBacktracking){
+        var statePath=stateRouter.computeCosts(start, goal);
+        var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround.
+        //If we're on the destination transition, backtrack along the transition
+        if(enableBacktracking && statePath.size()>=2 && eewgross.get(1)==previousState){
+            System.out.printf("Backtracking detected: %s -> %s\n",
+                eewgross.get(0),
+                eewgross.get(1)
+            );
+            statePath.poll();
+        }
+        this.statePath = statePath;
+
     }
 
     /** Set the state and wait indefinitely; Good for buttons.*/
@@ -199,6 +278,8 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 //TODO: I'm pretty sure I can pop this (contains the current node), see if the peek node is prior node,
                 //and then skip directly to a new pop
                 reschedule(statePath.peek());
+                internalState=InternalState.Updating;
+                manageStates();//ping the state machine for our next step
             },
             ()->{}
         );
@@ -224,6 +305,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             this.activeState=stateMap.get(state);
             this.activeCommand = activeState.commandSupplier.get();
             this.activeCommand.schedule();
+            this.internalState = InternalState.Forced;
         });
     }
 

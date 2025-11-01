@@ -79,6 +79,8 @@ public class RobotContainer {
     //Allow arbitrary tinkering of the coral status to muck with the states
     driver.leftBumper().onTrue(rollers.giveCoral());
     driver.rightBumper().onTrue(rollers.takeCoral());
+
+    driver.back().onTrue(fsm.forceState(BotState.L1_Score));
   }
 
   /**
@@ -90,26 +92,36 @@ public class RobotContainer {
 
     return new SequentialCommandGroup(
       Commands.print("AUTO initial stow"),
-      fsm.forceState(BotState.Home),
-      fsm.await().withTimeout(3),
+      // fsm.forceState(BotState.Home),
+      // fsm.await().withTimeout(3),
+      fsm.setWait(BotState.Stow),
 
       Commands.print("AUTO Station"),
-      fsm.setWait(BotState.IntakeStation),
-
+      fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
-      fsm.setWait(BotState.L1),
-      
-      Commands.print("DRIVING"),
-      new WaitCommand(0.5),
+      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
 
+      Commands.print("AUTO Station"),
+      fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
-      fsm.setWait(BotState.L1_Score),
+      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+
+      // Commands.print("DRIVING"),
+      // new WaitCommand(0.5),
+      Commands.print("AUTO Back  to stow"),
+      fsm.setWait(BotState.Stow),
 
       Commands.print("AUTO Floor"),
-      fsm.setWait(BotState.IntakeFloor),
-
-      Commands.print("AUTO L1 Again"),
-      fsm.setWait(BotState.L1_Score),
+      fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
+      Commands.print("AUTO L1"),
+      // fsm.setWait(BotState.L1),
+      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+      
+      Commands.print("AUTO Floor"),
+      fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
+      Commands.print("AUTO L1"),
+      // fsm.setWait(BotState.L1),
+      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
 
       Commands.print("AUTO Back  to stow"),
       fsm.setWait(BotState.Stow),
@@ -124,10 +136,12 @@ public class RobotContainer {
 
   public void initStates(){
       fsm.addState(BotState.Home,
+        //This would instead be a homing procecure, but this works for now. 
         ()->new ParallelCommandGroup(
-          //Do our homing process here.
+              arm.setAngle(()->0),
+              wrist.setAngle(()->120)
         ),
-        ()->true
+        arm.isAtTarget.and(wrist.isAtTarget).debounce(0.6)
       );
 
       fsm.addState(BotState.Stow,
@@ -145,12 +159,13 @@ public class RobotContainer {
               wrist.setAngle(()->0)
               // rollers.stop() //Left with defaultCommand
           ),
-          arm.isAtTarget.and(wrist.isAtTarget).debounce(0.1)
+          arm.isAtTarget.and(wrist.isAtTarget)
       );
 
       fsm.addState(BotState.L1_Score,
+        //Only accessable from L1, so we're at implied to be at the right spot
         ()->rollers.eject(),
-        arm.isAtTarget.and(wrist.isAtTarget)
+        arm.isAtTarget.and(wrist.isAtTarget).debounce(0.1)
       );
 
       fsm.addState( BotState.IntakeStation,
@@ -178,12 +193,12 @@ public class RobotContainer {
       fsm.addConnectionHub(BotState.L1,BotState.IntakeStation,BotState.IntakeFloor,BotState.L1_Score);
       // Connect some individual connections instead
       fsm.addConnection(BotState.L1, BotState.L1_Score);
-      fsm.addConnection(BotState.L1, BotState.IntakeStation);
-      fsm.addConnection(BotState.L1, BotState.Stow);
+      fsm.addDirectionalConnection(BotState.IntakeStation,BotState.L1);
+      fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
       
       //Set a unidirectional connection from our homing process
       fsm.addDirectionalConnection(BotState.Home,BotState.Stow);
-      fsm.addAutoTransition(BotState.Home, BotState.Stow,()->true);
+      fsm.addAutoTransition(BotState.Home, BotState.Stow);
 
       //Connect using relevant paths; Redundant connections will be ignored, 
       //but intersections will be used in routing.
@@ -192,9 +207,11 @@ public class RobotContainer {
       // fsm.addConnection(BotState.IntakeFloor, BotState.L1);
 
       // Automatically back out of some handling states when we're done there
-      fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate().debounce(0.3));
+      fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate());
+      fsm.addAutoTransition(BotState.L1_Score, BotState.L1);
+
       fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral,true);
-      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral,true);
+      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral,false);
       //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
       //between the two states!
 

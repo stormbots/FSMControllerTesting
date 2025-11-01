@@ -58,7 +58,7 @@ public class Rollers extends SubsystemBase {
     return Commands.parallel(
       run(()->velocity = RPM.of(10)),
       //Assume if we ran it for a few seconds we probably loaded something
-      Commands.waitSeconds(2).finallyDo(()->hasCoral=true)
+      Commands.waitSeconds(2).andThen(()->hasCoral=true)
     );
   }
 
@@ -66,11 +66,11 @@ public class Rollers extends SubsystemBase {
     return Commands.parallel(
       run(()->velocity = RPM.of(10)),
       //Assume if we ran it for several seconds we probably unloaded something
-      Commands.waitSeconds(2).finallyDo(()->hasCoral=false)
+      Commands.waitSeconds(1).andThen(()->hasCoral=false)
     );
   }
 
-  public Trigger isHoldingCoral = new Trigger(()->hasCoral);
+  public Trigger isHoldingCoral = new Trigger(()->hasCoral).debounce(0.2);
 
   public Command giveCoral(){
     return Commands.sequence(
