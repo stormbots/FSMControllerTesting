@@ -80,37 +80,45 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
 
 
+    private void reschedule(T state){
+        System.out.println("Rescheduling to "+state);
+        activeCommand.cancel();
+        priorState=activeState;
+        activeState = stateMap.get(state);
+        activeCommand=activeState.commandSupplier.get();
+        activeCommand.schedule();
+    }
+
     public void manageStates(){
         // SmartDashboard.putBoolean("fsm/atgoalstate",isAtGoalState.getAsBoolean());
 
         //Walk through our state queue
         //We only need to care about exit condition if we have more states.
         if(activeState.exitCondition.getAsBoolean() && statePath.size()>0){
-            System.out.println("Updating to "+statePath.peek());
-            activeCommand.cancel();
-            priorState=activeState;
-            activeState = stateMap.get(statePath.poll());
-            activeCommand=activeState.commandSupplier.get();
-            activeCommand.schedule();
+            reschedule(statePath.poll());
         }
-        else if( 
-            (activeCommand.isScheduled()==false && activeState.autotransitions.size()>0)
-            || (activeCommand.isScheduled() && activeState.exitCondition.getAsBoolean())
-        ){
-            //We have automated transition conditions. Check them. 
+        else if(activeCommand.isScheduled()==false && activeState.autotransitions.size()>0){
+            //Command exits and has auto-transitions
+            //TODO: Verify sugar for creating auto-transitioning commands. If there's no further quirks, 
+            //  this likely does not need to be a seperated branch/check with  special handling
+            //  Nominally, 
             for(var transition: activeState.autotransitions){
                 if(transition.condition.getAsBoolean()){
                     System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                    activeCommand.cancel();//redundant but nonissue
-                    priorState = activeState;
-                    activeState = stateMap.get(transition.destination);
-                    activeCommand=activeState.commandSupplier.get();
-                    activeCommand.schedule();
+                    reschedule(transition.destination);
                     break; //Don't check more conditions; First come first served.
                 }
-                // else{
-                //     System.out.println("Not transitioning from  "+activeState.name +" to " +transition.destination);
-                // }
+            }
+            //No valid auto-transitions.? Do we need to permanently schedule? This else if checking isn't helping
+        }
+        else if(activeCommand.isScheduled() && activeState.exitCondition.getAsBoolean()){
+            //command does *not* exit, so check it's automatic transitions
+            for(var transition: activeState.autotransitions){
+                if(transition.condition.getAsBoolean()){
+                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
+                    reschedule(transition.destination);
+                    break; //Don't check more conditions; First come first served.
+                }
             }
         }
         else if(activeCommand.isScheduled()==false){
@@ -153,14 +161,44 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround.
                 //If we're on the destination transition, backtrack along the transition
                 if(TRANSITION_BACKTRACKING && statePath.size()>=2 && eewgross.get(1)==priorState.name){
+                    System.out.printf("Backtracking detected: %s -> %s\n",
+                        eewgross.get(0),
+                        eewgross.get(1)
+                    );
                     statePath.poll();
-                }
+                    //The backtrack problem! 
+                    // if we can go from current -> prior, also path from prior->target and take
+                    // the lower valued route maybe?
+                    // Currently, it's doing what it *should* in the case that the state exit conditions
+                    // are unhelpfully tied to things like game pieces
 
-                this.statePath = statePath; 
-                this.activeCommand.cancel();
-                this.activeState = stateMap.get(statePath.peek());
-                this.activeCommand = activeState.commandSupplier.get();
-                this.activeCommand.schedule();
+                    //Ideas: If node not done but connects to prior node, fsm from prior node instead
+                    //if both nodes connect to new target, just ignore current node state?
+
+                    //The problem: 
+                    //- When changing states from a state with a unpredictable exit condition, 
+                    //  the process breaks down
+                    //- Avoid relying on difficult exit conditions?
+                    //- Add a bypass option
+                    //- Or.... just do auto-transitions but don't rely on externally controlled things? 
+
+                    //NO! Allow an option for "transitional" exit conditions. When the current node goes from
+                    // target->transition the exit condition may get swapped out with a more favorable one.
+                    // This allows automatic exits/leaf node exits and sudden updates
+                    // If it's optional it doesn't forcibly clutter the api, and the scheduler can use the 
+                    // most relevant one.
+                    
+                    //TODO: Do not cancel/reschedule the same node. This is causing glitchy motions when you button mash
+                    
+                }
+                this.statePath = statePath;
+                // var path = statePath.stream().map(String::toString)co
+                // System.out.printf("Pathing from %s -> %s\n",
+                // )
+
+                //TODO: I'm pretty sure I can pop this (contains the current node), see if the peek node is prior node,
+                //and then skip directly to a new pop
+                reschedule(statePath.peek());
             },
             ()->{}
         );

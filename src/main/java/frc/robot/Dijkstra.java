@@ -83,7 +83,7 @@ public class Dijkstra<T extends Enum<T>>{
     ArrayList<Vertex> unvisited = new ArrayList<>();
 
     public Dijkstra(){
-        // log.setLevel(Level.WARNING);
+        log.setLevel(Level.WARNING);
         // log.addHandler(new ConsoleHandler());
         // log.setLevel(Level.ALL);
     }
@@ -135,8 +135,8 @@ public class Dijkstra<T extends Enum<T>>{
         var last = graph.get(end);
         path.add(last.tag);
         if(last.previous!=null){
-            System.out.println(last);
-            graph.forEach((k,v)->System.out.println(v));
+            log.fine(last.toString());
+            graph.forEach((k,v)->log.fine(v.toString()));
         }
 
         while(true){

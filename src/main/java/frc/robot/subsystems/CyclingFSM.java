@@ -22,12 +22,12 @@ public class CyclingFSM extends SubsystemBase {
   /** Creates a new CyclingFSM. */
   public CyclingFSM() {
 
-    fsm.addState(States.a, ()->printy("a"), ()->true);
-    fsm.addState(States.b, ()->printy("b"), ()->true);
-    fsm.addState(States.c, ()->printy("c"), ()->true);
-    fsm.addState(States.d, ()->printy("d"), ()->true);
-    fsm.addState(States.even, ()->printy("even"), ()->true);
-    fsm.addState(States.odd, ()->printy("odd"), ()->true);
+    fsm.addState(States.a, ()->printy("a"),()->false);
+    fsm.addState(States.b, ()->printy("b"), ()->false);
+    fsm.addState(States.c, ()->printy("c"), ()->false);
+    fsm.addState(States.d, ()->printy("d"), ()->false);
+    fsm.addState(States.even, ()->printy("even"), ()->false);
+    fsm.addState(States.odd, ()->printy("odd"), ()->false);
 
     fsm.addConnection(States.a, States.b,1,false);
     fsm.addConnection(States.b, States.c,1,false);
