@@ -103,7 +103,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             //  this likely does not need to be a seperated branch/check with  special handling
             //  Nominally, 
             for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean()){
+                if(transition.condition.getAsBoolean() && (transition.requiresCompletion==false || activeState.exitCondition.getAsBoolean()) ){
                     System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
                     reschedule(transition.destination);
                     break; //Don't check more conditions; First come first served.
@@ -114,7 +114,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         else if(activeCommand.isScheduled() && activeState.exitCondition.getAsBoolean()){
             //command does *not* exit, so check it's automatic transitions
             for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean()){
+                if(transition.condition.getAsBoolean() && (transition.requiresCompletion==false || activeState.exitCondition.getAsBoolean())){
                     System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
                     reschedule(transition.destination);
                     break; //Don't check more conditions; First come first served.
@@ -360,25 +360,37 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      * @param condition 
      * @return
      */
-    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition){
+    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition, boolean requiresStateCompletion){
         var state = stateMap.get(fromState);
         if(state==null){
             throw new Error("Initial state not present in known FSM states. Add before setting transitions.");
         }
-        state.addAutoTransition(toState,condition);
+        state.addAutoTransition(toState,condition,requiresStateCompletion);
         return this;
     }
 
     /** Automatically transition from one state to another once its completion condition has been met.
+     * If multiple conditions are true simultaneously, the first one defined wins.
      * @param fromState
      * @param toState
      * @return
      */
     public FSM<T> addAutoTransition(T fromState, T toState){
-        addAutoTransition(fromState,toState,()->true);
+        addAutoTransition(fromState,toState,()->true,true);
         return this;
     }
-
+    
+    /** Automatically transition from one state to another once once the provided condition is met. 
+     * Does not require the standard state completion.
+     * @param fromState
+     * @param toState
+     * @param condition
+     * @return
+     */
+    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition){
+        addAutoTransition(fromState,toState,condition,false);
+        return this;
+    }
 
 
 
@@ -392,6 +404,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         public class AutoTransition<T>{
             public BooleanSupplier condition;
             public T destination;
+            public Boolean requiresCompletion;
         }
         public ArrayList<AutoTransition<T>> autotransitions = new ArrayList<>();
 
@@ -408,13 +421,19 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             this.exitCondition = exitCondition;
         }
 
-        public void addAutoTransition(T destination, BooleanSupplier condition){
+        /**
+         * Configure an automatic transition from this state to another
+         * @param destination
+         * @param condition the boolean condition under which we transition
+         * @param requiresStateCompletion Whether we also require the state's completion condition to be met.
+         */
+        public void addAutoTransition(T destination, BooleanSupplier condition, Boolean requiresStateCompletion){
             var t = new AutoTransition<T>();
             t.destination = destination;
             t.condition = condition;
+            t.requiresCompletion=requiresStateCompletion;
             autotransitions.add(t);
-        }
-        
+        }        
     }
 
     @Override

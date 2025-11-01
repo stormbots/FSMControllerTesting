@@ -59,7 +59,7 @@ public class MechView {
       this.wristSystem = wristSystem;
       this.rollersSystem = rollersSystem;
 
-      var barweight = 6;
+      var barweight = 3;
 
       arm.setColor(new Color8Bit(Color.kDarkGray));
       arm.setLineWeight(barweight * 2);

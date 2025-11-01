@@ -150,7 +150,7 @@ public class RobotContainer {
 
       fsm.addState(BotState.L1_Score,
         ()->rollers.eject(),
-        rollers.isHoldingCoral.negate().debounce(0.2)
+        arm.isAtTarget.and(wrist.isAtTarget)
       );
 
       fsm.addState( BotState.IntakeStation,
@@ -160,7 +160,7 @@ public class RobotContainer {
               rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
-          rollers.isHoldingCoral
+          arm.isAtTarget.and(wrist.isAtTarget)
       );
 
       fsm.addState( BotState.IntakeFloor,
@@ -170,7 +170,7 @@ public class RobotContainer {
               // rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
-          rollers.isHoldingCoral
+          arm.isAtTarget.and(wrist.isAtTarget)
       );
 
       //Connect using a couple hub nodes
@@ -193,8 +193,8 @@ public class RobotContainer {
 
       // Automatically back out of some handling states when we're done there
       fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate().debounce(0.3));
-      fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral);
-      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral);
+      fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral,true);
+      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral,true);
       //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
       //between the two states!
 
