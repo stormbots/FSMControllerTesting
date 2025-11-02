@@ -53,7 +53,11 @@ public class RobotContainer {
     L1,
     L1_Score,
     IntakeFloor,
-    IntakeStation
+    IntakeStation,
+    L2Front,
+    L2Front_Score,
+    L2Rear,
+    L2Rear_Score,
   }
   FSM<BotState> fsm = new FSM<>(BotState.Home);
 
@@ -94,6 +98,14 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    
+    // if(true) return Commands.sequence(
+    //   fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
+    //   fsm.setWait(BotState.L2Rear_Score).until(rollers.isHoldingCoral.negate()),
+    //   fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
+    //   fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate())
+    //   ).repeatedly();
+
 
     return new SequentialCommandGroup(
       Commands.print("AUTO initial stow"),
@@ -109,7 +121,7 @@ public class RobotContainer {
       Commands.print("AUTO Station"),
       fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
-      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate()),
 
       // Commands.print("DRIVING"),
       // new WaitCommand(0.5),
@@ -126,7 +138,7 @@ public class RobotContainer {
       fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
       // fsm.setWait(BotState.L1),
-      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate()),
 
       Commands.print("AUTO Back  to stow"),
       fsm.setWait(BotState.Stow),
@@ -198,7 +210,7 @@ public class RobotContainer {
           ()->new ParallelCommandGroup(
               arm.setAngle(()->90),
               wrist.setAngle(()->10),
-              extendo.setDistance(()->6),
+              extendo.setDistance(()->2),
               rollers.stop()
           ).until(atPosition)
           .andThen(rollers.intake()),
@@ -218,38 +230,67 @@ public class RobotContainer {
           rollers.isHoldingCoral
       );
 
+
+      fsm.addState(BotState.L2Front,
+      ()->new ParallelCommandGroup(
+            arm.setAngle(()->55),
+            wrist.setAngle(()->-90),
+            extendo.setDistance(()->10)
+        ),
+        atPosition
+      );
+
+      fsm.addState(BotState.L2Front_Score,
+        ()->rollers.eject(),
+        ()->true, //We generally don't care about this case
+        rollers.isHoldingCoral.negate()
+      );
+
+      fsm.addState(BotState.L2Rear,
+      ()->new ParallelCommandGroup(
+            arm.setAngle(()->85),
+            wrist.setAngle(()->135),
+            extendo.setDistance(()->5)
+        ),
+        atPosition
+      );
+
+      fsm.addState(BotState.L2Rear_Score,
+        ()->rollers.eject(),
+        ()->true, //We generally don't care about this case
+        rollers.isHoldingCoral.negate()
+      );
+
+
+
       //Connect our transition poses
       fsm.addConnection(BotState.Stow, BotState.Crossover);
 
       //Connect up the front side
       fsm.addConnectionHub(BotState.Stow,BotState.L1, BotState.IntakeFloor);
-      fsm.addConnection(BotState.L1, BotState.L1_Score);
       fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
-      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeFloor,BotState.L1);
+      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeFloor,BotState.L1,BotState.L2Front);
 
       //Connect up the reverse side
-      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeStation);
+      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeStation,BotState.L2Rear);
 
-
+      //Connect scoring states up
       fsm.addConnection(BotState.L1, BotState.L1_Score);
+      fsm.addConnection(BotState.L2Front, BotState.L2Front_Score);
+      fsm.addConnection(BotState.L2Rear, BotState.L2Rear_Score);
       fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
       
       //Set a unidirectional connection from our homing process
       fsm.addDirectionalConnection(BotState.Home,BotState.Stow);
       fsm.addAutoTransition(BotState.Home, BotState.Stow);
 
-      //Connect using relevant paths; Redundant connections will be ignored, 
-      //but intersections will be used in routing.
-      // fsm.addConnection(BotState.Stow, BotState.L1, BotState.L1_Score); 
-      // fsm.addConnection(BotState.IntakeStation, BotState.Stow, BotState.L1, BotState.L1_Score); 
-      // fsm.addConnection(BotState.IntakeFloor, BotState.L1);
-
       // Automatically back out of some handling states when we're done there
       fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate());
-      // fsm.addAutoTransition(BotState.L1_Score, BotState.L1);
+      fsm.addAutoTransition(BotState.L2Front_Score, BotState.L2Front, rollers.isHoldingCoral.negate());
+      fsm.addAutoTransition(BotState.L2Rear_Score, BotState.L2Rear, rollers.isHoldingCoral.negate());
 
       fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral,true);
-      fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral,false);
+      fsm.addAutoTransition(BotState.IntakeStation, BotState.Crossover, rollers.isHoldingCoral,false);
 
       //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
       //between the two states!
