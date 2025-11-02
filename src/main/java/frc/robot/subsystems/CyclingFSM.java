@@ -67,6 +67,5 @@ public class CyclingFSM extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
     SmartDashboard.putString("cycle/current", fsm.getActiveState().toString());
-    SmartDashboard.putBoolean("cycle/done?", fsm.activeCommand.isScheduled());
   }
 }
