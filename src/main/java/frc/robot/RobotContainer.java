@@ -97,7 +97,7 @@ public class RobotContainer {
       fsm.setWait(BotState.Stow),
 
       Commands.print("AUTO Station"),
-      fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
+      fsm.setWait(BotState.IntakeStation),//.until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
       fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
 
@@ -165,7 +165,8 @@ public class RobotContainer {
       fsm.addState(BotState.L1_Score,
         //Only accessable from L1, so we're at implied to be at the right spot
         ()->rollers.eject(),
-        arm.isAtTarget.and(wrist.isAtTarget).debounce(0.1)
+        ()->true, //We generally don't care about this case
+        rollers.isHoldingCoral.negate()
       );
 
       fsm.addState( BotState.IntakeStation,
@@ -175,7 +176,8 @@ public class RobotContainer {
               rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
-          arm.isAtTarget.and(wrist.isAtTarget)
+          arm.isAtTarget.and(wrist.isAtTarget),
+          rollers.isHoldingCoral
       );
 
       fsm.addState( BotState.IntakeFloor,
@@ -185,7 +187,8 @@ public class RobotContainer {
               // rollers.stop()
           ).until(arm.isAtTarget.and(wrist.isAtTarget))
           .andThen(rollers.intake()),
-          arm.isAtTarget.and(wrist.isAtTarget)
+          arm.isAtTarget.and(wrist.isAtTarget),
+          rollers.isHoldingCoral
       );
 
       //Connect using a couple hub nodes
@@ -208,10 +211,11 @@ public class RobotContainer {
 
       // Automatically back out of some handling states when we're done there
       fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate());
-      fsm.addAutoTransition(BotState.L1_Score, BotState.L1);
+      // fsm.addAutoTransition(BotState.L1_Score, BotState.L1);
 
       fsm.addAutoTransition(BotState.IntakeFloor, BotState.Stow, rollers.isHoldingCoral,true);
       fsm.addAutoTransition(BotState.IntakeStation, BotState.Stow, rollers.isHoldingCoral,false);
+
       //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
       //between the two states!
 

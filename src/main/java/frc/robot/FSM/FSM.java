@@ -25,25 +25,46 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     HashMap<T,FSMState<T>> stateMap = new HashMap<>();
     FSMState<T> activeState;
     FSMState<T> priorState;
-    public Command activeCommand = Commands.idle();
+    private Command activeCommand = Commands.idle();
     private boolean running=false;
     private T initialState;
 
     Dijkstra<T> stateRouter = new Dijkstra<>();
     Deque<T> statePath=new ArrayDeque<>();
 
+    public enum InternalState{
+        Traversing,
+        ApproachingGoal,
+        AtGoal,
+        Unscheduled,
+        Forced,
+        Updating
+    }
+    private InternalState internalState=InternalState.Unscheduled;
+
+
     /** This exists to efficiently convert Strings back to state names */
     private Map<String,Enum<T>> stringMap = new HashMap<>();
 
     /** Allow routing to backtrack along edge transitions, 
      * allowing drivers to more easily "undo" longer motions
+     * when those states have bidirectional links.
      */
-    private final boolean TRANSITION_BACKTRACKING = true;
+    private boolean enableStateBacktracking=true;
+
+    /** The default cost when setting up connections */
+    private double defaultCost=1;
 
     /** Generic test for reaching the intended goal state */
-    public Trigger isAtGoalState=new Trigger(()->
-        statePath.isEmpty() && this.activeState!=null && this.activeState.exitCondition.getAsBoolean()
+    public Trigger isGoalStateComplete=new Trigger(()->
+        // statePath.isEmpty() && this.activeState!=null && this.activeState.goalCompletionCondition.getAsBoolean()
+        internalState==InternalState.AtGoal && activeState.goalCompletionCondition.getAsBoolean()
     );
+    public Trigger isAtGoalState=new Trigger(()->
+        (internalState==InternalState.ApproachingGoal || internalState==InternalState.AtGoal)
+        && activeState.transitionCompletionCondition.getAsBoolean()
+    ).or(isGoalStateComplete);
+    ;
 
     /**
      * Create a new Finite State Machine. 
@@ -54,7 +75,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         //This is just to prevent potential null references throughout the code.
         //Adding the state definition later will overwrite this. 
         this.initialState=initialState;
-        this.activeState=new FSMState<T>(initialState, Commands::none, ()->false);
+        this.activeState=new FSMState<T>(initialState, Commands::none, ()->true, ()->false);
         this.priorState=activeState;
 
         new Trigger(DriverStation::isEnabled)
@@ -78,6 +99,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
 
 
+    /** Schedule a target state command, cancelling any existing commands */
     private void reschedule(T state){
         //Avoid re-scheduling running commands
         if(activeState.name==state && activeCommand.isScheduled()) return;
@@ -90,26 +112,59 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         activeCommand.schedule();
     }
 
-    public enum InternalState{
-        Traversing,
-        ApproachingGoal,
-        AtGoal,
-        Unscheduled,
-        Forced,
-        Updating
+    /** Generate a path between various states, considering the backtracking considerations */
+    private void updatePath(T start,T goal, T previousState, boolean enableBacktracking){
+        var statePath=stateRouter.computeCosts(start, goal);
+        var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround. Fix backing data structure
+        //If we're on the destination transition, backtrack along the transition
+        if(enableBacktracking && statePath.size()>=2 && eewgross.get(1)==previousState){
+            System.out.printf("Backtracking detected: %s -> %s\n",
+                eewgross.get(0),
+                eewgross.get(1)
+            );
+            statePath.poll();
+        }
+        this.statePath = statePath;
     }
-    private InternalState internalState=InternalState.Unscheduled;
-    public void manageStates(){
+
+    /**
+     * Check the auto transitions, changing states if
+     * - Our state is completed, and a matching condition applies
+     * - OR we don't care about the completion, but have a matching transition
+     * Backtracking/shortcutting is permitted on states where the goal transition state is not required.
+     * @return
+     */
+    private boolean checkAutoTransitions(){
+        var activeStateComplete=activeState.goalCompletionCondition.getAsBoolean();
+        for(var transition: activeState.autotransitions){
+            if( (activeStateComplete || transition.requiresCompletion==false) && transition.condition.getAsBoolean()){
+                System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
+                System.out.println(transition);
+                //TODO: Test backtracking assumptions under a variety of conditions. This seems to do the Right Thing
+                //but worth being careful of and noting.
+                updatePath(activeState.name, transition.destination, priorState.name, transition.requiresCompletion==false);
+                reschedule(statePath.peek());
+                internalState = InternalState.Updating;
+                return true; //from loop //Don't check more conditions; First come first served.
+            }
+        }
+        return false;
+    }
+
+
+    /**
+     * The primary operation to manage the state changes 
+     */
+    private void manageStates(){
         /*IMPLEMENTATION NOTE:
         * This switch has several intentional fallthroughs to enable a single bot cycle
         * to make multiple internal state transitions at once. Because this is running
         * on a potato, has a real-world time savings of 20ms per fallthrough, meaning
         * we save up to 0.1s for certain interactions.
         */
-        
         switch(internalState){
         case Traversing:
-            if(activeState.exitCondition.getAsBoolean()){
+            if(activeState.transitionCompletionCondition.getAsBoolean()){
                 internalState=InternalState.Updating;
                 //intentional fallthrough to next case
             }else{
@@ -117,51 +172,38 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             }
 
         case Updating:
-            //We have more states!
             if(statePath.size()>1){
+                //We have more states!
                 reschedule(statePath.poll());
                 internalState=InternalState.Traversing;
                 break;
-            }else if(statePath.size()>0){
+            } else if(statePath.size()>0){
+                //We only have one state, which means it's our goal
                 reschedule(statePath.poll());
                 internalState=InternalState.ApproachingGoal;
-                // break;
                 //fallthrough to next
-            }else{
+            } else {
+                //Something triggered a re-schedule, but we've already
+                //scheduled our final state. Therefore, goal.
                 internalState = InternalState.ApproachingGoal;
                 //fallthrough to next
             }
 
         case ApproachingGoal:
-            for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean() && transition.requiresCompletion==false){
-                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                    internalState=InternalState.Updating;
-                    updatePath(activeState.name, transition.destination, priorState.name, false);
-                    reschedule(statePath.poll());
-                    internalState = InternalState.Updating;
-                    // reschedule(transition.destination);
-                    break; //from loop //Don't check more conditions; First come first served.
-                }
-            }
-            
-            if(activeState.exitCondition.getAsBoolean()){
+            checkAutoTransitions();
+
+            if(activeState.transitionCompletionCondition.getAsBoolean()){
                 internalState = InternalState.AtGoal;
                 //intentional fallthrough
-            }else{
-                break;
+            }else if(activeState.goalCompletionCondition.getAsBoolean()){
+                    internalState = InternalState.AtGoal;
+                    //intentional fallthrough
+                }else{
+                    break;
             }
 
         case AtGoal:
-            for(var transition: activeState.autotransitions){
-                if(transition.condition.getAsBoolean()){
-                    System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                    updatePath(activeState.name, transition.destination, priorState.name, false);
-                    reschedule(statePath.poll());
-                    internalState=InternalState.Updating;
-                    break; //from loop //Don't check more conditions; First come first served.
-                }
-            }
+            checkAutoTransitions();
 
             if(activeCommand.isScheduled()==true){
                 //Expected case: Nothing to do
@@ -177,14 +219,15 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             //An Auto Transition should have fired, or we should have a command that is still running
             //In this case, re-schedule it with a .forever()
 
-            //Blocked out for now because for whatever reason this state *does* seem to trigger
+            //Commented out for now because for whatever reason this state *does* seem to trigger constantly, 
+            //causing glitches. It seems like something clunky with the scheduler and auto-transition timing.
 
-            System.err.printf(
-                "State command %s unexpectedly exited without transition. Rescheduling indefinitely.\n",
-                activeState.name.toString()
-            );
-            reschedule(activeState.name);
-            // activeState.commandSupplier.get().repeatedly().schedule();
+            // System.err.printf(
+            //     "State command %s unexpectedly exited without transition. Rescheduling indefinitely.\n",
+            //     activeState.name.toString()
+            // );
+            // reschedule(activeState.name);
+            // activeState.commandSupplier.get().schedule();
 
             internalState = InternalState.Updating;
             break;
@@ -203,83 +246,29 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         return activeState.name;
     }
 
+    /** Return the enum for the goal state */
+    public T getGoalState(){
+        return statePath.isEmpty() ? activeState.name : statePath.peekLast();
+    }
+
     /** Returns true if the FSM is at the indicated state and the completion supplier is true. */
     public boolean isAtState(T state){
-        return activeState.name==state && isAtGoalState.getAsBoolean();
+        return activeState.name==state && isGoalStateComplete.getAsBoolean();
     }
 
     /** Set the state and wait for completion. Good for sequencing. */
     public Command setWait(T state){
-        return setRun(state).until(isAtGoalState);
-    }
-
-
-    public void updatePath(T start,T goal, T previousState, boolean enableBacktracking){
-        var statePath=stateRouter.computeCosts(start, goal);
-        var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround.
-        //If we're on the destination transition, backtrack along the transition
-        if(enableBacktracking && statePath.size()>=2 && eewgross.get(1)==previousState){
-            System.out.printf("Backtracking detected: %s -> %s\n",
-                eewgross.get(0),
-                eewgross.get(1)
-            );
-            statePath.poll();
-        }
-        this.statePath = statePath;
-
+        return setRun(state).until(isGoalStateComplete);
     }
 
     /** Set the state and wait indefinitely; Good for buttons.*/
     public Command setRun(T state){
-        //TODO Optimize: If current state is between returned "active node" and current "target node",
-        // skip returning to the current node.
-
         return Commands.startRun(
             ()->{
-                var statePath=stateRouter.computeCosts(activeState.name, state);
-                var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround.
-                //If we're on the destination transition, backtrack along the transition
-                if(TRANSITION_BACKTRACKING && statePath.size()>=2 && eewgross.get(1)==priorState.name){
-                    System.out.printf("Backtracking detected: %s -> %s\n",
-                        eewgross.get(0),
-                        eewgross.get(1)
-                    );
-                    statePath.poll();
-                    //The backtrack problem! 
-                    // if we can go from current -> prior, also path from prior->target and take
-                    // the lower valued route maybe?
-                    // Currently, it's doing what it *should* in the case that the state exit conditions
-                    // are unhelpfully tied to things like game pieces
-
-                    //Ideas: If node not done but connects to prior node, fsm from prior node instead
-                    //if both nodes connect to new target, just ignore current node state?
-
-                    //The problem: 
-                    //- When changing states from a state with a unpredictable exit condition, 
-                    //  the process breaks down
-                    //- Avoid relying on difficult exit conditions?
-                    //- Add a bypass option
-                    //- Or.... just do auto-transitions but don't rely on externally controlled things? 
-
-                    //NO! Allow an option for "transitional" exit conditions. When the current node goes from
-                    // target->transition the exit condition may get swapped out with a more favorable one.
-                    // This allows automatic exits/leaf node exits and sudden updates
-                    // If it's optional it doesn't forcibly clutter the api, and the scheduler can use the 
-                    // most relevant one.
-                    
-                    //TODO: Do not cancel/reschedule the same node. This is causing glitchy motions when you button mash
-                    
-                }
-                this.statePath = statePath;
-                // var path = statePath.stream().map(String::toString)co
-                // System.out.printf("Pathing from %s -> %s\n",
-                // )
-
-                //TODO: I'm pretty sure I can pop this (contains the current node), see if the peek node is prior node,
-                //and then skip directly to a new pop
+                updatePath(activeState.name, state, priorState.name, enableStateBacktracking);
                 reschedule(statePath.peek());
                 internalState=InternalState.Updating;
-                manageStates();//ping the state machine for our next step
+                // manageStates();//ping the state machine for our next step
             },
             ()->{}
         );
@@ -295,7 +284,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     /** Wait for the currently set goal state to be reached. Pairs well with {@link #setAsync(Enum)}. */
     public Command await(){
-        return Commands.waitUntil(isAtGoalState);
+        return Commands.waitUntil(isGoalStateComplete);
     }
 
     /** Forcibly set a state change, bypassing state pathing. */
@@ -343,6 +332,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      * When the state is an intermediate state during a longer transition, the CompletionSupplier
      * reporting true means it can progress to the next step. 
      * <br/>
+     * The alternate form {@link #addState(Enum, Supplier, BooleanSupplier, BooleanSupplier)} can
+     * be used to provide seperate cases when the completion goals differ when a goal state vs 
+     * when part of a transition path.
+     * <br/>
      * When a goal or target state is complete, FSM based commands like {@link #setWait(Enum)}
      * will terminate, allowing progression of sequences.
      * <br/>
@@ -355,13 +348,32 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      * @return
      */
     public FSM<T> addState(T name, Supplier<Command> commandSupplier, BooleanSupplier completionSupplier){
-        addState(new FSMState<T>(name,commandSupplier,completionSupplier));
+        addState(new FSMState<T>(name,commandSupplier,completionSupplier,completionSupplier));
         return this;
-
     }
 
     /**
-     * Connect two states, allowing unidirectional connections
+     * Add a new state, specifying independent goals when the state is a transition state vs a goal state
+     * 
+     * @param name
+     * @param commandSupplier
+     * @param transitionCompletionSupplier
+     * @param goalCompletionSupplier
+     * @return
+     */
+    public FSM<T> addState(
+        T name, 
+        Supplier<Command> commandSupplier, 
+        BooleanSupplier transitionCompletionSupplier,
+        BooleanSupplier goalCompletionSupplier
+    ){
+        addState(new FSMState<T>(name,commandSupplier,transitionCompletionSupplier,goalCompletionSupplier));
+        return this;
+    }
+
+
+    /**
+     * Connect two states together with appropriate cost and directionality.
      * @param state1
      * @param state2
      * @param cost Must be greater than zero: 1 is a good default.
@@ -385,7 +397,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         return this;
     }
 
-    /** Connect two or more states sequences using default costs.
+    /** Connect two or more states sequences using default cost.
      * Can be used to define a full sequence in one go.
      * Connections will be bi-directional.
      * @param states
@@ -396,7 +408,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             throw new Error("Need two or more connections");
         }
         for(int i=1; i<states.length; i++){
-            addConnection(states[i-1],states[i],1);
+            addConnection(states[i-1],states[i],defaultCost);
         }
         
         return this;
@@ -413,7 +425,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             throw new Error("Need two or more connections");
         }
         for(int i=1; i<states.length; i++){
-            addConnection(states[i-1],states[i],1,false);
+            addConnection(states[i-1],states[i], defaultCost,false);
         }
         
         return this;
@@ -427,7 +439,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             throw new Error("Need one or more connections");
         }
         for(int i=0; i<states.length; i++){
-            addConnection(hubState,states[i],1);
+            addConnection(hubState,states[i], defaultCost);
         }
         
         return this;
@@ -442,12 +454,12 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      * @param condition 
      * @return
      */
-    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition, boolean requiresStateCompletion){
+    public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition, boolean requiresTransitionCompletion){
         var state = stateMap.get(fromState);
         if(state==null){
             throw new Error("Initial state not present in known FSM states. Add before setting transitions.");
         }
-        state.addAutoTransition(toState,condition,requiresStateCompletion);
+        state.addAutoTransition(toState,condition,requiresTransitionCompletion);
         return this;
     }
 
@@ -480,13 +492,23 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      */
     public static class FSMState<T extends Enum<T>>{
         public Supplier<Command> commandSupplier = ()->new InstantCommand();
-        public BooleanSupplier exitCondition=()->false;
+        public BooleanSupplier transitionCompletionCondition=()->false;
+        public BooleanSupplier goalCompletionCondition=()->false;
         public T name;
 
         public class AutoTransition<T>{
             public BooleanSupplier condition;
             public T destination;
             public Boolean requiresCompletion;
+            public String toString(){
+                return String.format("AT(%s->%s|()->%s|()->%s && %s)",
+                    name.toString(),
+                    destination.toString(),
+                    condition.getAsBoolean(),
+                    goalCompletionCondition.getAsBoolean(),
+                    requiresCompletion
+                );
+            }
         }
         public ArrayList<AutoTransition<T>> autotransitions = new ArrayList<>();
 
@@ -494,13 +516,19 @@ public class FSM<T extends Enum<T>>  implements Sendable{
          * Provide a state with name, command, and exit conditions.
          * @param name
          * @param commandSupplier
-         * @param exitCondition
+         * @param transitionCompletionCondition
          */
-        public FSMState(T name, Supplier<Command> commandSupplier, BooleanSupplier exitCondition){
+        public FSMState(
+                T name,
+                Supplier<Command> commandSupplier,
+                BooleanSupplier transitionCompletionCondition,
+                BooleanSupplier goalCompletionCondition
+            ){
             // System.out.println(name.toString());
             this.name = name;
             this.commandSupplier = commandSupplier;
-            this.exitCondition = exitCondition;
+            this.transitionCompletionCondition = transitionCompletionCondition;
+            this.goalCompletionCondition = goalCompletionCondition;
         }
 
         /**
@@ -520,19 +548,16 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
     @Override
     public void initSendable(SendableBuilder builder) {
-        builder.addBooleanProperty("Goal Complete", isAtGoalState, null);
+        builder.addBooleanProperty("Transition Complete", isGoalStateComplete, null);
+        builder.addBooleanProperty("Goal Complete", isGoalStateComplete, null);
         builder.addStringProperty("Current State", activeState.name::toString, null);
         builder.addBooleanProperty("running", ()->this.running, null);
     }
 
 
     //TODO: Missing useful items
-    // optional "transition command" to be used in place of decorating initial command: Jack in the bot uses this for sequentially moving arm and reversing it
     //"distance" function for the FSM to attempt state recovery
     //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
-
-    // add state builder of addState(id,command,transitionTo)) to allow for 
-    //   sequences that just end normally to transition without complex workarounds
 
     //Optional config to ignore enable/disable when scheduling
 
