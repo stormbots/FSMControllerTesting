@@ -22,9 +22,9 @@ import frc.robot.Dijkstra;
 
 public class FSM<T extends Enum<T>>  implements Sendable{
 
-    HashMap<T,FSMState<T>> stateMap = new HashMap<>();
-    FSMState<T> activeState;
-    FSMState<T> priorState;
+    private HashMap<T,FSMState<T>> stateMap = new HashMap<>();
+    private FSMState<T> activeState;
+    private FSMState<T> priorState;
     private Command activeCommand = Commands.idle();
     private boolean running=false;
     private T initialState;

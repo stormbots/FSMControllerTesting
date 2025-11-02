@@ -4,20 +4,21 @@
 
 package frc.robot;
 
+import static edu.wpi.first.units.Units.Degree;
+import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Inches;
+
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.FSM.FSM;
-import frc.robot.subsystems.CyclingFSM;
-import frc.robot.subsystems.IntakeFSM;
 import frc.robot.subsystems.Arm.Arm;
-import frc.robot.subsystems.CyclingFSM.States;
+import frc.robot.subsystems.Extendo.Extendo;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
 
@@ -31,11 +32,12 @@ public class RobotContainer {
   final static Arm arm = new Arm();
   final static Wrist wrist = new Wrist(arm::getState);
   final static Rollers rollers = new Rollers();
+  final static Extendo extendo = new Extendo(arm::getState);
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandXboxController driver = new CommandXboxController(0);
 
-  MechView mechanism = new MechView(arm,wrist,rollers);
+  MechView mechanism = new MechView(arm,wrist,extendo,rollers);
 
   //This is a demo FSM that just cycles between various states. 
   // Subsystem FSMs might wind up looking similar
@@ -47,12 +49,15 @@ public class RobotContainer {
   public enum BotState{
     Home,
     Stow,
+    Crossover,
     L1,
     L1_Score,
     IntakeFloor,
     IntakeStation
   }
   FSM<BotState> fsm = new FSM<>(BotState.Home);
+
+  Trigger atPosition = arm.isAtTarget.and(wrist.isAtTarget);//.and(extendo.isAtTarget);
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -139,27 +144,47 @@ public class RobotContainer {
         //This would instead be a homing procecure, but this works for now. 
         ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
-              wrist.setAngle(()->120)
+              wrist.setAngle(()->120),
+              extendo.setDistance(()->0)
         ),
-        arm.isAtTarget.and(wrist.isAtTarget).debounce(0.6)
+        atPosition
       );
 
       fsm.addState(BotState.Stow,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
-              wrist.setAngle(()->120)
+              wrist.setAngle(()->120),
+              extendo.setDistance(()->0)
               // rollers.stop() //Left alone, so it runs defaultCommand
           ),
-          arm.isAtTarget.and(wrist.isAtTarget)
+          ()->{return 
+            arm.getAngle().lte(Degrees.of(45))
+            &&extendo.getDistance().lte(Inches.of(0.5))
+            &&wrist.getAngle().gte(Degree.of(90));
+          },
+          atPosition
       );
+
+      fsm.addState(BotState.Crossover,
+      ()->new ParallelCommandGroup(
+            arm.setAngle(()->60),
+            wrist.setAngle(()->0),
+            extendo.setDistance(()->0)
+        ),
+        ()->{return 
+          extendo.getDistance().lte(Inches.of(0.5))
+          && arm.getAngle().isNear(Degree.of(60), Degree.of(20));
+        },
+        atPosition
+    );
 
       fsm.addState(BotState.L1,
         ()->new ParallelCommandGroup(
               arm.setAngle(()->45),
-              wrist.setAngle(()->0)
-              // rollers.stop() //Left with defaultCommand
+              wrist.setAngle(()->0),
+              extendo.setDistance(()->0)
           ),
-          arm.isAtTarget.and(wrist.isAtTarget)
+          atPosition
       );
 
       fsm.addState(BotState.L1_Score,
@@ -173,30 +198,40 @@ public class RobotContainer {
           ()->new ParallelCommandGroup(
               arm.setAngle(()->90),
               wrist.setAngle(()->10),
+              extendo.setDistance(()->6),
               rollers.stop()
-          ).until(arm.isAtTarget.and(wrist.isAtTarget))
+          ).until(atPosition)
           .andThen(rollers.intake()),
-          arm.isAtTarget.and(wrist.isAtTarget),
+          atPosition,
           rollers.isHoldingCoral
       );
 
       fsm.addState( BotState.IntakeFloor,
           ()->new ParallelCommandGroup(
               arm.setAngle(()->0),
-              wrist.setAngle(()->-20)//,
+              wrist.setAngle(()->-20),
+              extendo.setDistance(()->0)
               // rollers.stop()
-          ).until(arm.isAtTarget.and(wrist.isAtTarget))
+          ).until(atPosition)
           .andThen(rollers.intake()),
-          arm.isAtTarget.and(wrist.isAtTarget),
+          atPosition,
           rollers.isHoldingCoral
       );
 
-      //Connect using a couple hub nodes
-      fsm.addConnectionHub(BotState.Stow, BotState.IntakeStation, BotState.L1, BotState.IntakeFloor);
-      fsm.addConnectionHub(BotState.L1,BotState.IntakeStation,BotState.IntakeFloor,BotState.L1_Score);
-      // Connect some individual connections instead
+      //Connect our transition poses
+      fsm.addConnection(BotState.Stow, BotState.Crossover);
+
+      //Connect up the front side
+      fsm.addConnectionHub(BotState.Stow,BotState.L1, BotState.IntakeFloor);
       fsm.addConnection(BotState.L1, BotState.L1_Score);
-      fsm.addDirectionalConnection(BotState.IntakeStation,BotState.L1);
+      fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
+      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeFloor,BotState.L1);
+
+      //Connect up the reverse side
+      fsm.addConnectionHub(BotState.Crossover,BotState.IntakeStation);
+
+
+      fsm.addConnection(BotState.L1, BotState.L1_Score);
       fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
       
       //Set a unidirectional connection from our homing process

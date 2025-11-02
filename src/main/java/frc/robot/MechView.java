@@ -7,9 +7,9 @@ package frc.robot;
 import static edu.wpi.first.units.Units.Degree;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
+import static edu.wpi.first.units.Units.Inches;
+import static edu.wpi.first.units.Units.Meter;
 
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.smartdashboard.Mechanism2d;
 import edu.wpi.first.wpilibj.smartdashboard.MechanismLigament2d;
 import edu.wpi.first.wpilibj.smartdashboard.MechanismRoot2d;
@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Rollers.Rollers;
 import frc.robot.subsystems.Wrist.Wrist;
+import frc.robot.subsystems.Extendo.*;;
 
 /** Add your docs here. */
 public class MechView {
@@ -27,7 +28,8 @@ public class MechView {
     Arm armSystem;
     Wrist wristSystem;
     Rollers rollersSystem;
-
+    Extendo extendoSystem;
+    
     //visual constants
     double angledelta = 15;
     double barlength = 24;
@@ -38,7 +40,8 @@ public class MechView {
 
     //Major systems
     MechanismLigament2d arm = root.append(new MechanismLigament2d("Arm", 16, 0));
-    MechanismLigament2d wrist = arm.append(new MechanismLigament2d("Wrist", 4, 0));
+    MechanismLigament2d extendo = arm.append(new MechanismLigament2d("Extendo", 0, 0));
+    MechanismLigament2d wrist = extendo.append(new MechanismLigament2d("Wrist", 4, 0));
     MechanismLigament2d rollers = wrist.append(new MechanismLigament2d("Rollers", 1, 0));
     MechanismLigament2d rollersR = wrist.append(new MechanismLigament2d("RollersInverse", -1, 0));
     
@@ -46,23 +49,28 @@ public class MechView {
     MechanismLigament2d chassisTop = root.append(new MechanismLigament2d("ChassisTop", 16, 0));
     MechanismLigament2d chassisBack = root.append(new MechanismLigament2d("ChassisBack", 4, -90));
     MechanismLigament2d chassisFront = chassisTop.append(new MechanismLigament2d("ChassisBack", 4, -90));
-    MechanismLigament2d wristBackstop = arm.append(new MechanismLigament2d("WristBackstop", 2, 0));
+    MechanismLigament2d wristBackstop = extendo.append(new MechanismLigament2d("WristBackstop", 2, 0));
 
     MechanismLigament2d coral = wrist.append(new MechanismLigament2d("Coral", 6, 0));
 
     public MechView( 
       Arm armSystem,
       Wrist wristSystem,
+      Extendo extendoSystem,
       Rollers rollersSystem
     ) {
       this.armSystem = armSystem;
       this.wristSystem = wristSystem;
+      this.extendoSystem = extendoSystem;
       this.rollersSystem = rollersSystem;
 
       var barweight = 3;
 
       arm.setColor(new Color8Bit(Color.kDarkGray));
       arm.setLineWeight(barweight * 2);
+
+      extendo.setColor(new Color8Bit(Color.kAqua));
+      extendo.setLineWeight(barweight * 1.5);
 
       wrist.setColor(new Color8Bit(Color.kGray));
       wrist.setLineWeight(barweight);
@@ -92,6 +100,8 @@ public class MechView {
     }
 
     public void update() {
+      extendo.setLength(extendoSystem.getDistance().in(Inches));
+
       arm.setAngle(armSystem.getAngle().in(Degree));
       wrist.setAngle(wristSystem.getAngle().in(Degree));
       
