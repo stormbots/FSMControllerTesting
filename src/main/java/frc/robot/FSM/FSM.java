@@ -268,7 +268,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 updatePath(activeState.name, state, priorState.name, enableStateBacktracking);
                 reschedule(statePath.peek());
                 internalState=InternalState.Updating;
-                manageStates();//ping the state machine for our next step
+                //TODO: Better analysis of if we want an immediate FSM ping. 
+                // I think it just forces unscheduled commands due to the scheduler's operation, 
+                // causing unexpected fall throughs to the "unscheduled" case.
+                // manageStates();//ping the state machine for our next step
             },
             ()->{}
         );
