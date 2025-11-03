@@ -58,6 +58,8 @@ public class RobotContainer {
     L2Front_Score,
     L2Rear,
     L2Rear_Score,
+    LockdownReady,
+    LockdownLocked
   }
   FSM<BotState> fsm = new FSM<>(BotState.Home);
 
@@ -141,7 +143,10 @@ public class RobotContainer {
       fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate()),
 
       Commands.print("AUTO Back  to stow"),
-      fsm.setWait(BotState.Stow),
+      // fsm.setWait(BotState.Stow),
+
+      Commands.print("AUTO Lock the bot"),
+      fsm.setWait(BotState.LockdownLocked),
 
       Commands.none()
     );
@@ -261,6 +266,23 @@ public class RobotContainer {
         rollers.isHoldingCoral.negate()
       );
 
+      fsm.addState(BotState.LockdownReady,
+      ()->new ParallelCommandGroup(
+            arm.setAngle(()->0),
+            wrist.setAngle(()->135),
+            extendo.setDistance(()->0)
+        ),
+        atPosition.debounce(0.2)
+      );
+
+      fsm.addState(BotState.LockdownLocked,
+      ()->new ParallelCommandGroup(
+            arm.setAngle(()->0),
+            wrist.setAngle(()->135),
+            extendo.setDistance(()->1)
+        ),
+        atPosition
+      );
 
 
       //Connect our transition poses
@@ -270,6 +292,7 @@ public class RobotContainer {
       fsm.addConnectionHub(BotState.Stow,BotState.L1, BotState.IntakeFloor);
       fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
       fsm.addConnectionHub(BotState.Crossover,BotState.IntakeFloor,BotState.L1,BotState.L2Front);
+      fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
 
       //Connect up the reverse side
       fsm.addConnectionHub(BotState.Crossover,BotState.IntakeStation,BotState.L2Rear);
@@ -278,11 +301,13 @@ public class RobotContainer {
       fsm.addConnection(BotState.L1, BotState.L1_Score);
       fsm.addConnection(BotState.L2Front, BotState.L2Front_Score);
       fsm.addConnection(BotState.L2Rear, BotState.L2Rear_Score);
-      fsm.addDirectionalConnection(BotState.IntakeFloor,BotState.L1);
       
       //Set a unidirectional connection from our homing process
       fsm.addDirectionalConnection(BotState.Home,BotState.Stow);
       fsm.addAutoTransition(BotState.Home, BotState.Stow);
+
+      //Simple sequential setup
+      fsm.addConnection(BotState.Stow,BotState.LockdownReady,BotState.LockdownLocked);
 
       // Automatically back out of some handling states when we're done there
       fsm.addAutoTransition(BotState.L1_Score, BotState.L1, rollers.isHoldingCoral.negate());
