@@ -268,7 +268,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 updatePath(activeState.name, state, priorState.name, enableStateBacktracking);
                 reschedule(statePath.peek());
                 internalState=InternalState.Updating;
-                // manageStates();//ping the state machine for our next step
+                manageStates();//ping the state machine for our next step
             },
             ()->{}
         );
