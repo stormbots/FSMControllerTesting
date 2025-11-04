@@ -82,7 +82,8 @@ public class Dijkstra<T extends Enum<T>>{
     HashMap<T,Vertex> graph= new HashMap<>();
     ArrayList<Vertex> unvisited = new ArrayList<>();
 
-    public Dijkstra(){
+    public Dijkstra(String description){
+        log=Logger.getLogger("Dijkstra."+description);
         log.setLevel(Level.WARNING);
         // log.addHandler(new ConsoleHandler());
         // log.setLevel(Level.ALL);
