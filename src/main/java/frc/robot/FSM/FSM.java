@@ -8,6 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -29,7 +35,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     private boolean running=false;
     private T initialState;
 
-    Dijkstra<T> stateRouter = new Dijkstra<>();
+    Dijkstra<T> stateRouter;//Declared in constructor
     Deque<T> statePath=new ArrayDeque<>();
 
     public enum InternalState{
@@ -42,6 +48,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
     private InternalState internalState=InternalState.Unscheduled;
 
+    private Logger log;
 
     /** This exists to efficiently convert Strings back to state names */
     private Map<String,Enum<T>> stringMap = new HashMap<>();
@@ -66,34 +73,48 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     ).or(isGoalStateComplete);
     ;
 
+
+
     /**
      * Create a new Finite State Machine. 
      * Will begin in the provided initial state
      * @param initialState
      */
     public FSM(T initialState){
+        //Figure out the base name of our Enum: This is a runtime operation, so it must be done in constructor
+        var enumName=initialState.getClass().getSimpleName().toString();
+
+        //Set up our logging
+        log=Logger.getLogger("FSM."+enumName);
+        configLogging();
+
+        //Create our state router
+        stateRouter = new Dijkstra<>(enumName);
+        
         //This is just to prevent potential null references throughout the code.
         //Adding the state definition later will overwrite this. 
         this.initialState=initialState;
         this.activeState=new FSMState<T>(initialState, Commands::none, ()->true, ()->false);
         this.priorState=activeState;
 
+        //Register the state manager to run whenever the robot is operating
         new Trigger(DriverStation::isEnabled)
         .whileTrue(Commands.run(this::manageStates)
             .beforeStarting(()->this.running=true)
             .finallyDo(()->this.running=false)
         );
 
+        //Set up a dashboard selector
+        //TODO: Not fully functional as of yet
         SendableChooser<T> chooser = new SendableChooser<>();
         chooser.setDefaultOption(initialState.toString(), initialState);
 
-        System.out.println("Building string map");
+        log.fine("Building String map");
         for(var s: initialState.getClass().getEnumConstants()){
-            System.out.println(s);
             stringMap.put(s.toString(), (T)s);
             chooser.addOption(s.toString(), (T)s);
         }
-        System.out.println(stringMap);
+        log.fine(stringMap.toString());
         SmartDashboard.putData(this.toString()+"/chooser",chooser);
 
     }
@@ -104,7 +125,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         //Avoid re-scheduling running commands
         if(activeState.name==state && activeCommand.isScheduled()) return;
 
-        System.out.println("Rescheduling to "+state);
+        log.info("Rescheduling to "+state);
         activeCommand.cancel();
         priorState=activeState;
         activeState = stateMap.get(state);
@@ -118,10 +139,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         var eewgross = List.copyOf(statePath); //FIXME: can't index into deques, so gross workaround. Fix backing data structure
         //If we're on the destination transition, backtrack along the transition
         if(enableBacktracking && statePath.size()>=2 && eewgross.get(1)==previousState){
-            System.out.printf("Backtracking detected: %s -> %s\n",
+            log.info(String.format("Backtracking detected: %s -> %s",
                 eewgross.get(0),
                 eewgross.get(1)
-            );
+            ));
             statePath.poll();
         }
         this.statePath = statePath;
@@ -138,8 +159,12 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         var activeStateComplete=activeState.goalCompletionCondition.getAsBoolean();
         for(var transition: activeState.autotransitions){
             if( (activeStateComplete || transition.requiresCompletion==false) && transition.condition.getAsBoolean()){
-                System.out.println("Auto Transition from  "+activeState.name +" to " +transition.destination);
-                System.out.println(transition);
+                log.info(String.format("Auto Transition from: %s to %s",
+                    activeState.name,
+                    transition.destination
+                ));
+                log.fine(transition.toString());
+
                 //TODO: Test backtracking assumptions under a variety of conditions. This seems to do the Right Thing
                 //but worth being careful of and noting.
                 updatePath(activeState.name, transition.destination, priorState.name, transition.requiresCompletion==false);
@@ -222,10 +247,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             //Commented out for now because for whatever reason this state *does* seem to trigger constantly, 
             //causing glitches. It seems like something clunky with the scheduler and auto-transition timing.
 
-            // System.err.printf(
+            // log.warning(String.format(
             //     "State command %s unexpectedly exited without transition. Rescheduling indefinitely.\n",
             //     activeState.name.toString()
-            // );
+            // ));
             // reschedule(activeState.name);
             // activeState.commandSupplier.get().schedule();
 
@@ -290,7 +315,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         return Commands.waitUntil(isGoalStateComplete);
     }
 
-    /** Forcibly set a state change, bypassing state pathing. */
+    /** Forcibly set a state change, bypassing state pathing and auto transitions. */
     public Command forceState(T state){
         return Commands.runOnce(()->{
             statePath.clear();
@@ -311,10 +336,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     public FSM<T> addState(FSMState<T> state){
         if(stateMap.containsKey(state.name)){
             var str = String.format("Duplicate definition of state %s",
-            state.name.toString()
-        );
-        throw new Error(str);
-
+                state.name.toString()
+            );
+            log.severe(str);
+            throw new Error(str);
         }
 
         if(state.name==initialState) activeState = state;
@@ -388,6 +413,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             var str = String.format("Cost must be greater than zero for transition %s -> %s (given %n)",
                 state1.toString(),state2.toString(),cost
             );
+            log.severe(str);
             throw new Error(str);
         }
         stateRouter.addConnection(state1, state2, cost, bidirectional);
@@ -408,7 +434,9 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     */
     public FSM<T> addConnection(T... states){
         if(states.length<=1){
-            throw new Error("Need two or more connections");
+            var str="Need two or more states to connect";
+            log.severe(str);
+            throw new Error(str);
         }
         for(int i=1; i<states.length; i++){
             addConnection(states[i-1],states[i],defaultCost);
@@ -418,14 +446,16 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
 
     /** 
-     * Connect multiple states in a using default costs. 
+     * Connect multiple states in a sequence using default costs. 
      * The connections will be uni-directional.
      * @param states
      * @return
      */
     public FSM<T> addDirectionalConnection(T... states){
         if(states.length<=1){
-            throw new Error("Need two or more connections");
+            var str="Need two or more states to connect";
+            log.severe(str);
+            throw new Error(str);
         }
         for(int i=1; i<states.length; i++){
             addConnection(states[i-1],states[i], defaultCost,false);
@@ -439,7 +469,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     /** Connect one hub state to multiple other states simultaneously. Uses default cost of 1*/
     public FSM<T> addConnectionHub(T hubState, T... states){
         if(states.length<1){
-            throw new Error("Need one or more connections");
+            var str="Need two or more states to connect";
+            log.severe(str);
+            throw new Error(str);
+
         }
         for(int i=0; i<states.length; i++){
             addConnection(hubState,states[i], defaultCost);
@@ -460,7 +493,9 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     public FSM<T> addAutoTransition(T fromState, T toState, BooleanSupplier condition, boolean requiresTransitionCompletion){
         var state = stateMap.get(fromState);
         if(state==null){
-            throw new Error("Initial state not present in known FSM states. Add before setting transitions.");
+            var str="Initial state not present in known FSM states. Add before setting transitions.";
+            log.severe(str);
+            throw new Error(str);
         }
         state.addAutoTransition(toState,condition,requiresTransitionCompletion);
         return this;
@@ -527,7 +562,6 @@ public class FSM<T extends Enum<T>>  implements Sendable{
                 BooleanSupplier transitionCompletionCondition,
                 BooleanSupplier goalCompletionCondition
             ){
-            // System.out.println(name.toString());
             this.name = name;
             this.commandSupplier = commandSupplier;
             this.transitionCompletionCondition = transitionCompletionCondition;
@@ -553,8 +587,53 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     public void initSendable(SendableBuilder builder) {
         builder.addBooleanProperty("Transition Complete", isGoalStateComplete, null);
         builder.addBooleanProperty("Goal Complete", isGoalStateComplete, null);
-        builder.addStringProperty("Current State", activeState.name::toString, null);
+        builder.addStringProperty("Current State", ()->activeState.name.toString(), null);
         builder.addBooleanProperty("running", ()->this.running, null);
+    }
+
+
+    ///////////////////////////
+    // Other Logging details //
+    ///////////////////////////
+
+    /** Stop the logger from spamming multiple lines with nonsensical timestamps */
+    private class OnelineFormatter extends Formatter {
+        @Override
+        public String format(LogRecord record) {
+            return String.format("%s::%s | %s\n",
+            record.getLoggerName(),
+            record.getLevel(),
+            record.getMessage()
+            );
+        }
+    }
+
+    /** This is needed to actually print to stdout instead of stderr */
+    private class StdoutConsoleHandler extends ConsoleHandler {
+        protected void setOutputStream(OutputStream out) throws SecurityException {
+            super.setOutputStream(System.out); 
+        }
+    }
+
+    /** Ensure the logging */
+    private void configLogging(){
+        //Set up logging details
+        log.setUseParentHandlers(false);
+        Handler handler = new StdoutConsoleHandler();
+        handler.setFormatter(new OnelineFormatter());
+        handler.setLevel(Level.INFO);
+        log.addHandler(handler);
+    }
+
+    /** Adjust how noisy the FSM is about various state changes. 
+     * Helpful values are 
+     * Level.OFF to disable,
+     * Level.INFO to see standard transition updates (default)
+     * Level.FINE for debugging.
+     * Level.SEVERE for errors or unexpected state actions.
+     */
+    public void setLogLevel(Level loglevel){
+        log.setLevel(loglevel);
     }
 
 
