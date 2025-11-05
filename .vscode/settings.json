@@ -56,5 +56,8 @@
     "edu.wpi.first.math.proto.*",
     "edu.wpi.first.math.**.proto.*",
     "edu.wpi.first.math.**.struct.*",
-  ]
+  ],
+  "chat.agent.enabled": false,
+  "telemetry.feedback.enabled": false,
+  "chat.commandCenter.enabled": false,
 }
