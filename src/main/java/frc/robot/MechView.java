@@ -64,6 +64,9 @@ public class MechView {
       this.extendoSystem = extendoSystem;
       this.rollersSystem = rollersSystem;
 
+      arm.setLength(armSystem.getLength().in(Inches));
+      wrist.setLength(wristSystem.getLength().in(Inches));
+
       var barweight = 3;
 
       arm.setColor(new Color8Bit(Color.kDarkGray));

@@ -5,6 +5,7 @@
 package frc.robot.subsystems.Extendo;
 
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Inch;
 import static edu.wpi.first.units.Units.Inches;
 import static edu.wpi.first.units.Units.Radians;
 
@@ -127,6 +128,9 @@ public class Extendo extends SubsystemBase {
   public Command setDistance(double position){
     return setDistance(()->position);
   }
+  public Command setDistance(Supplier<Distance> position){
+    return setDistance(()->position.get().in(Inches));
+  }
 
   public Command setDistance(DoubleSupplier position){
     return startRun(
@@ -156,6 +160,15 @@ public class Extendo extends SubsystemBase {
     ;
   }
 
+  public void setPID(Supplier<Distance> position){
+    var ff = feedforward.calculate(position.get().in(Inch), 0);
+    motor.getClosedLoopController()
+    .setReference(
+      position.get().in(Inch),
+      ControlType.kPosition, ClosedLoopSlot.kSlot0,
+      ff, ArbFFUnits.kVoltage
+    );
+  }
 
   /** Apply only feedforward outputs to halt powered motion */
   public Command stop(){

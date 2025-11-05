@@ -1,5 +1,6 @@
 package frc.robot.FSM;
 
+import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -14,6 +15,7 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -34,6 +36,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     private Command activeCommand = Commands.idle();
     private boolean running=false;
     private T initialState;
+    private boolean enabled=true;
 
     Dijkstra<T> stateRouter;//Declared in constructor
     Deque<T> statePath=new ArrayDeque<>();
@@ -99,6 +102,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
         //Register the state manager to run whenever the robot is operating
         new Trigger(DriverStation::isEnabled)
+        .and(()->this.enabled)
         .whileTrue(Commands.run(this::manageStates)
             .beforeStarting(()->this.running=true)
             .finallyDo(()->this.running=false)
@@ -524,6 +528,14 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         return this;
     }
 
+
+    public Command disable(){
+        return Commands.runOnce(()->enabled=false);
+    }
+    /** Enable the state machine, then force the provided state */
+    public Command enable(T forcedState){
+        return forceState(forcedState).beforeStarting(()->enabled=true);
+    }
 
 
     /** Container for state data.
