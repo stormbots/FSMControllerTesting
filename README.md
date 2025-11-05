@@ -36,10 +36,12 @@ public enum IntakeState{ //Can be named whatever! Each FSM should have a unique 
     Ejecting,
 }
 ///Connect your state list to the FSM manager
-FSM<IntakeState> fsm = new FSM<>(IntakeStateUnloaded);
+/// The provided is the "initial" state for the FSM when the robot boots.
+FSM<IntakeState> fsm = new FSM<>(IntakeState.Unloaded);
 
 ///Define your state actions
 /// This is similar to just setting up commands for each intended action
+/// Conditions can be BooleanSuppliers or Triggers, whatever is appropriate
 fsm.addState(IntakeState.Unloaded,
     ()->rollers.set(0),
     rollers.haveGamePiece 
@@ -90,7 +92,7 @@ fsm.addDirectionalConnection(
     IntakeState.Unloaded,
 );
 
-//Now we can turn those completion conditions into state transitions
+//Now we can turn those completion conditions into automated state transitions
 //As each condition is met, This will cause it to traverse the state graph to the 
 //destination state. In this case, they're all very close by.
 fsm.addAutoTransition( IntakeState.Unloaded, IntakeState.Loading );
@@ -106,6 +108,13 @@ joystick.a().whileTrue( fsm.setWait(IntakeState.Scoring) );
 joystick.back().whileTrue( fsm.forceState(IntakeState.Unloaded) );
 
 ```
+
+## Complete Example
+For a fully defined state machine with a more complex connection graph, see 
+[RobotContainer](src/main/java/frc/robot/RobotContainer.java) . 
+
+This project is fully simulated, with an autonomous mode that cycles through many states, as well as 
+a few basic states configured on a joystick.
 
 ## Useful Patterns
 
@@ -182,6 +191,13 @@ fsm.addAutoTransition(fromState, toState,()->true,true);
 fsm.addAutoTransition(fromState, toState,()->condition)
 //which is equivilent to
 fsm.addAutoTransition(fromState, toState,()->condition,false);
+
+//Also of note: Autotransitions do *not* imply or create a direct link between the states!
+//This is becasue they generate a traversal path too! Meaning, with this setup
+fsm.addDirectionalConnection(StateA,StateB,StateC,StateD,StateA);
+fsm.addAutoTransition(StateA, StateD)
+//the triggered transition will traverse the state machine from 
+//StateA to StateB, then StateC, *then* to StateD!
 ```
 
 ## Interacting with the FSM
