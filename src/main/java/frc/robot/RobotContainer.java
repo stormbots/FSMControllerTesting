@@ -7,8 +7,11 @@ package frc.robot;
 import static edu.wpi.first.units.Units.Degree;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.Inches;
+import static edu.wpi.first.units.Units.InchesPerSecond;
 
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -38,6 +41,7 @@ public class RobotContainer {
   private final CommandXboxController driver = new CommandXboxController(0);
 
   MechView mechanism = new MechView(arm,wrist,extendo,rollers);
+  ArmIK ik = new ArmIK(arm,extendo,wrist);
 
   //This is a demo FSM that just cycles between various states. 
   // Subsystem FSMs might wind up looking similar
@@ -108,6 +112,18 @@ public class RobotContainer {
     //   fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate())
     //   ).repeatedly();
 
+    // if(true) return Commands.sequence(
+    //   fsm.disable(),
+    //   ik.interp(()->new Translation2d(+724, 0), InchesPerSecond.of(6), ()->Degrees.of(0)).withTimeout(5),
+    //   ik.interp(()->new Translation2d(7, 24), InchesPerSecond.of(6), ()->Degrees.of(0)).withTimeout(5)
+    // ).repeatedly();
+
+    //Show off the IK by holding a point in space and moving in a circle
+    // if(true) return Commands.sequence(
+    //   fsm.disable(),
+    //   ik.runIK(()->8, ()->24, ()->-180+(Timer.getFPGATimestamp()*20%360))
+    // ).repeatedly();
+
 
     return new SequentialCommandGroup(
       Commands.print("AUTO initial stow"),
@@ -140,7 +156,10 @@ public class RobotContainer {
       fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
       Commands.print("AUTO L1"),
       // fsm.setWait(BotState.L1),
-      fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L2Rear_Score).until(rollers.isHoldingCoral.negate()),
+
+      //Just for fun swing it back to L2Rear to show the FSM midpoint
+      fsm.setWait(BotState.L2Front).until(atPosition),
 
       Commands.print("AUTO Back  to stow"),
       // fsm.setWait(BotState.Stow),
@@ -237,11 +256,7 @@ public class RobotContainer {
 
 
       fsm.addState(BotState.L2Front,
-      ()->new ParallelCommandGroup(
-            arm.setAngle(()->55),
-            wrist.setAngle(()->-90),
-            extendo.setDistance(()->10)
-        ),
+      ()->ik.runIK(()->20,()->30,()->-45),
         atPosition
       );
 
@@ -252,11 +267,7 @@ public class RobotContainer {
       );
 
       fsm.addState(BotState.L2Rear,
-      ()->new ParallelCommandGroup(
-            arm.setAngle(()->85),
-            wrist.setAngle(()->135),
-            extendo.setDistance(()->5)
-        ),
+      ()->ik.runIK(()->2,()->30,()->225),
         atPosition
       );
 

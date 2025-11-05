@@ -5,6 +5,7 @@
 package frc.robot.subsystems.Wrist;
 
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Inches;
 import static edu.wpi.first.units.Units.Radians;
 
 import java.util.function.DoubleSupplier;
@@ -27,6 +28,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ArmFeedforward;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.Timer;
@@ -113,13 +115,17 @@ public class Wrist extends SubsystemBase {
   public void periodic() {
     // This method will be called once per scheduler run
     SmartDashboard.putNumber("wrist/angle", getAngle().in(Degrees));
+    SmartDashboard.putNumber("wrist/angle(ground)", getAngleGround().in(Degrees));
     SmartDashboard.putBoolean("wrist/at target", isAtTarget.getAsBoolean());
     SmartDashboard.putBoolean("wrist/at target (rough)", isRoughlyAtTarget.getAsBoolean());
   }
 
-
+  /** Angle of the wrist relative to the arm */
   public Angle getAngle(){
     return Degrees.of(motor.getEncoder().getPosition());
+  }
+  public Angle getAngleGround(){
+    return Degrees.of(motor.getEncoder().getPosition() + armStateProvider.get().position);
   }
 
   private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
@@ -155,10 +161,28 @@ public class Wrist extends SubsystemBase {
     ;
   }
 
+  public void setPID(Supplier<Angle> position){
+    var ff = feedforward.calculate(position.get().in(Degrees), 0);
+    motor.getClosedLoopController()
+    .setReference(
+      position.get().in(Degrees),
+      ControlType.kPosition, ClosedLoopSlot.kSlot0,
+      ff, ArbFFUnits.kVoltage
+    );
+  }
+
+
   public Command setAngleFromGround(DoubleSupplier position){
     return setAngle(()->position.getAsDouble() - armStateProvider.get().position);
   }
 
+  public Command setAngleFromGround(Supplier<Angle> position){
+    return setAngleFromGround(()->position.get().in(Degrees));
+  }
+
+  public Distance getLength(){
+    return Inches.of(4);
+  }
 
   /** Apply only feedforward outputs to halt powered motion */
   public Command stop(){

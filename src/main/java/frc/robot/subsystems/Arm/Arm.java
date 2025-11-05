@@ -7,9 +7,11 @@ package frc.robot.subsystems.Arm;
 import static edu.wpi.first.units.Units.Degree;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
+import static edu.wpi.first.units.Units.Inches;
 import static edu.wpi.first.units.Units.Radians;
 
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 import com.revrobotics.REVLibError;
 import com.revrobotics.spark.ClosedLoopSlot;
@@ -135,6 +137,10 @@ public class Arm extends SubsystemBase {
     );
   }
 
+  public Command setAngle(Supplier<Angle> position){
+    return setAngle(()->position.get().in(Degrees));
+  }
+
   public Command setAngle(DoubleSupplier position){
     return startRun(
       ()->{
@@ -164,6 +170,18 @@ public class Arm extends SubsystemBase {
     ;
   }
 
+  public void setPID(Supplier<Angle> position){
+    var ff = feedforward.calculate(position.get().in(Degrees), 0);
+    motor.getClosedLoopController()
+    .setReference(
+      position.get().in(Degrees),
+      ControlType.kPosition, ClosedLoopSlot.kSlot0,
+      ff, ArbFFUnits.kVoltage
+    );
+  }
+
+
+
   /** Apply only feedforward outputs to halt powered motion */
   public Command stop(){
     return run(()->{
@@ -180,5 +198,9 @@ public class Arm extends SubsystemBase {
     MathUtil.isNear(goal.position, motor.getEncoder().getPosition(), 10)
     &&MathUtil.isNear(goal.velocity, motor.getEncoder().getVelocity(), 100)
   );
+
+  public Distance getLength(){
+    return Inches.of(16);
+  }
 
 }

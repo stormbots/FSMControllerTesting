@@ -1,5 +1,6 @@
 package frc.robot.FSM;
 
+import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -14,6 +15,7 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -34,6 +36,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     private Command activeCommand = Commands.idle();
     private boolean running=false;
     private T initialState;
+    private boolean enabled=true;
 
     Dijkstra<T> stateRouter;//Declared in constructor
     Deque<T> statePath=new ArrayDeque<>();
@@ -99,6 +102,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
 
         //Register the state manager to run whenever the robot is operating
         new Trigger(DriverStation::isEnabled)
+        .and(()->this.enabled)
         .whileTrue(Commands.run(this::manageStates)
             .beforeStarting(()->this.running=true)
             .finallyDo(()->this.running=false)
@@ -525,6 +529,14 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     }
 
 
+    public Command disable(){
+        return Commands.runOnce(()->enabled=false);
+    }
+    /** Enable the state machine, then force the provided state */
+    public Command enable(T forcedState){
+        return forceState(forcedState).beforeStarting(()->enabled=true);
+    }
+
 
     /** Container for state data.
      */
@@ -597,7 +609,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     ///////////////////////////
 
     /** Stop the logger from spamming multiple lines with nonsensical timestamps */
-    public class OnelineFormatter extends Formatter {
+    private class OnelineFormatter extends Formatter {
         @Override
         public String format(LogRecord record) {
             return String.format("%s::%s | %s\n",
@@ -608,17 +620,22 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         }
     }
 
+    /** This is needed to actually print to stdout instead of stderr */
+    private class StdoutConsoleHandler extends ConsoleHandler {
+        protected void setOutputStream(OutputStream out) throws SecurityException {
+            super.setOutputStream(System.out); 
+        }
+    }
+
     /** Ensure the logging */
     private void configLogging(){
         //Set up logging details
-
         log.setUseParentHandlers(false);
-        Handler handler = new ConsoleHandler();
+        Handler handler = new StdoutConsoleHandler();
         handler.setFormatter(new OnelineFormatter());
         handler.setLevel(Level.INFO);
         log.addHandler(handler);
     }
-
 
     /** Adjust how noisy the FSM is about various state changes. 
      * Helpful values are 
