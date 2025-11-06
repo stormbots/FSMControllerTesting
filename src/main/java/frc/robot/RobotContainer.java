@@ -132,14 +132,14 @@ public class RobotContainer {
       fsm.setWait(BotState.Stow),
 
       Commands.print("AUTO Station"),
-      fsm.setWait(BotState.IntakeStation),//.until(rollers.isHoldingCoral),
+      fsm.setWait(BotState.IntakeStation),
       Commands.print("AUTO L1"),
-      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L1_Score),
 
       Commands.print("AUTO Station"),
-      fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),
+      fsm.setWait(BotState.IntakeStation),
       Commands.print("AUTO L1"),
-      fsm.setWait(BotState.L2Front_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L2Front_Score),
 
       // Commands.print("DRIVING"),
       // new WaitCommand(0.5),
@@ -147,19 +147,20 @@ public class RobotContainer {
       fsm.setWait(BotState.Stow),
 
       Commands.print("AUTO Floor"),
-      fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
+      fsm.setWait(BotState.IntakeFloor),
+
       Commands.print("AUTO L1"),
       // fsm.setWait(BotState.L1),
-      fsm.setWait(BotState.L1_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L1_Score),
       
       Commands.print("AUTO Floor"),
-      fsm.setWait(BotState.IntakeFloor).until(rollers.isHoldingCoral),
+      fsm.setWait(BotState.IntakeFloor),
       Commands.print("AUTO L1"),
       // fsm.setWait(BotState.L1),
-      fsm.setWait(BotState.L2Rear_Score).until(rollers.isHoldingCoral.negate()),
+      fsm.setWait(BotState.L2Rear_Score),
 
       //Just for fun swing it back to L2Rear to show the FSM midpoint
-      fsm.setWait(BotState.L2Front).until(atPosition),
+      fsm.setWait(BotState.L2Front),
 
       Commands.print("AUTO Back  to stow"),
       // fsm.setWait(BotState.Stow),
