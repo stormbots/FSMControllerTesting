@@ -252,3 +252,38 @@ fsm.isAtState(state) // Specifically query if we're at a specific state.
 // to the STDout/Riolog. This behaviour can be configured with, and outputs made more or less noisy.
 setLogLevel(Level.<level>)
 ```
+
+
+## Fault Recovery
+
+In the case a FSM can be disrupted and become out of sync with the physical robot state, 
+(due to power loss, enable/disable, or code pushes), fault recovery options are provided.
+
+This can help avoid unexpected motions to the normal initial state, especially when such motions 
+could involve physical conflicts or collisions.
+
+States can be provided additional "distance" or "cost" functions, and any such states 
+are then considered for fault recovery.
+
+```java
+fsm.addRecoveryState(PivotState.Right, ()->Math.hypot(   0, pivot.getAngle() ));
+fsm.addRecoveryState(PivotState.Up,   ()->Math.hypot(  90, pivot.getAngle() ));
+fsm.addRecoveryState(PivotState.Left,  ()->Math.hypot( 180, pivot.getAngle() ));
+//Reminder that Math.Hypot(a,b) -> squareroot(a^2 + b^2)
+
+//This operation will compare any provided conditions, selecting the lowest value.
+fsm.recoverCurrentState()
+
+```
+
+You can also return arbitrarily sized distances via if/else conditions or ternary checks.
+
+```java
+fsm.addRecoveryState(PivotState.Left,   ()-> pivot.getAngle()>120 ? -1 : 10000 );
+fsm.addRecoveryState(PivotState.Right,  ()-> pivot.getAngle()< 10 ? -1 : 10000 );
+fsm.addRecoveryState(PivotState.Up,   ()-> 0 );
+// Reminder that ternary expressions evaluate as (booleancondition ? whentrue : whenfalse)
+
+// ...
+fsm.recoverCurrentState()
+```

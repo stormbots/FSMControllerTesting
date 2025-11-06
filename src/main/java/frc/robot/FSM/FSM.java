@@ -7,7 +7,9 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
@@ -15,7 +17,6 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.util.logging.StreamHandler;
 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -264,9 +265,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         case Forced:
             //We go to the current state, no questions asked or other conditions considered.
             //We will exit this state when something reschedules it normally.
-            activeState.commandSupplier.get().schedule();
+            if(activeCommand.isScheduled()==false){
+                activeState.commandSupplier.get().schedule();
+            }
         }
-        SmartDashboard.putString("fsmInternalState", internalState.toString());
     }
 
 
@@ -330,6 +332,44 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         });
     }
 
+
+    /** 
+     * Check functions provided by {@link #addRecoveryState(Enum, DoubleSupplier)}, 
+     * evaluating the distance functions, and deciding upon the nearest state.
+     * 
+     * The command will then force a state transition to the identified state, 
+     * resuming normal FSM operation on completion, or when interrupted by manual input.
+     * 
+     * This can be used as an escape hatch to have the bot gracefully recover from 
+     * unexpected code reboots or power cycles where the physical state and FSM are 
+     * misaligned. 
+     * 
+     * When no recovery states are provided, this command will assume the initial state
+     * passed to the constructor.
+     * @return
+    */
+    public Command recoverCurrentState(){
+        return Commands.startRun(()->{
+            //Figure out the closest state 
+            var closest=stateMap
+            .values()
+            .stream()
+            .filter((e)->e.recoveryCost.isPresent())
+            .min((a,b)->Double.compare(
+                a.recoveryCost.get().getAsDouble(),
+                b.recoveryCost.get().getAsDouble()
+            ))
+            ;
+            log.severe("Performing state recovery");
+            this.internalState = InternalState.Forced;
+            reschedule(closest.orElse(stateMap.get(initialState)).name);
+            },
+            ()->{}
+        )
+        .until(()->activeState.goalCompletionCondition.getAsBoolean())
+        .finallyDo((e)->{if(!e){this.internalState=InternalState.AtGoal;}})
+        ;
+    }
 
     /**
      * Add an externally defined FSMState directly.
@@ -545,6 +585,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         public BooleanSupplier transitionCompletionCondition=()->false;
         public BooleanSupplier goalCompletionCondition=()->false;
         public T name;
+        public Optional<DoubleSupplier> recoveryCost=Optional.empty();
 
         public class AutoTransition<T>{
             public BooleanSupplier condition;
@@ -592,8 +633,31 @@ public class FSM<T extends Enum<T>>  implements Sendable{
             t.condition = condition;
             t.requiresCompletion=requiresStateCompletion;
             autotransitions.add(t);
-        }        
+        }
     }
+
+    /**
+     * Configure a state as a potential recovery state in case of fault, 
+     * error, power loss, or other unusual scenarios that could cause 
+     * the FSM to de-sync with the physical robot state. 
+     * 
+     * During evaluation by {@link #recoverCurrentState()}, the lowest cost 
+     * function is determined to be the closest state.
+     * 
+     * It may help to consider this function the "distance" to the goal state.
+     * 
+     * In case of exhaustive or binary considerations, you could also use an arbitrarily large 
+     * positive/negative values
+     * 
+     * @param state the recovery state
+     * @param costFunction  
+     * @return
+     */
+    public FSM<T> addRecoveryState(T state, DoubleSupplier costFunction){
+        stateMap.get(state).recoveryCost=Optional.of(costFunction);
+        return this;
+    }
+
 
     @Override
     public void initSendable(SendableBuilder builder) {
@@ -601,6 +665,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
         builder.addBooleanProperty("Goal Complete", isGoalStateComplete, null);
         builder.addStringProperty("Current State", ()->activeState.name.toString(), null);
         builder.addBooleanProperty("running", ()->this.running, null);
+        builder.addStringProperty("FSM Internal State", ()->internalState.toString(), null);
     }
 
 
@@ -654,5 +719,10 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
 
     //Optional config to ignore enable/disable when scheduling
+    //TODO: Better handle generated command methods. While these do exit, they're not predictable.
+    //  Specifically, if an exit condition is attached to a sequence, but that sequence is interrupted,
+    //  it may trigger an onComplete in the wrong state or at an unexpected time, causing significant confusion. 
+    //  Setting FSM as a subsystem to allow slef commands to use requires mutex is probably the simplest option,
+    //  but other structures may need to be considered.
 
 }

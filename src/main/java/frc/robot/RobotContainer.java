@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.FSM.FSM;
@@ -67,7 +68,7 @@ public class RobotContainer {
   }
   FSM<BotState> fsm = new FSM<>(BotState.Home);
 
-  Trigger atPosition = arm.isAtTarget.and(wrist.isAtTarget);//.and(extendo.isAtTarget);
+  Trigger atPosition = arm.isAtTarget.and(wrist.isAtTarget).and(extendo.isAtTarget);
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -96,6 +97,9 @@ public class RobotContainer {
     driver.rightBumper().onTrue(rollers.takeCoral());
 
     driver.back().onTrue(fsm.forceState(BotState.L1_Score));
+
+    //Fix any state position messes
+    new Trigger(DriverStation::isTeleopEnabled).onTrue(fsm.recoverCurrentState());
   }
 
   /**
@@ -126,6 +130,9 @@ public class RobotContainer {
 
 
     return new SequentialCommandGroup(
+      fsm.recoverCurrentState(),
+      // Commands.waitSeconds(2),
+
       Commands.print("AUTO initial stow"),
       // fsm.forceState(BotState.Home),
       // fsm.await().withTimeout(3),
@@ -332,7 +339,11 @@ public class RobotContainer {
       //Note, auto-transitions use a routed sequence, and do not require or imply a direct path
       //between the two states!
 
-
+      //Configure potential recovery states
+      fsm.addRecoveryState(BotState.Stow,()->ik.getDistance(12,0));
+      fsm.addRecoveryState(BotState.Crossover,()->ik.getDistance(12,12));
+      fsm.addRecoveryState(BotState.IntakeStation,()->ik.getDistance(0,16));
+      fsm.addRecoveryState(BotState.L2Front,()->ik.getDistance(20,30));
   }
 
 

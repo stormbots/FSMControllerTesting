@@ -132,9 +132,13 @@ public class ArmIK {
             // extendo.setPID(()->pose.extendo);
 
         },wrist,arm,extendo);
-        
     }
 
+    //Get a end effector distance to target position
+    public double getDistance(double xInches, double yInches){
+        var xy=xy();
+        return new Translation2d(xy.x,xy.y).getDistance(new Translation2d(xInches, yInches));
+    }
 
     public void updateKinematics(){
         var c=xy();
