@@ -15,6 +15,7 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.LinearVelocity;
 import edu.wpi.first.units.measure.Time;
+
 import edu.wpi.first.units.measure.Velocity;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -52,7 +53,7 @@ public class ArmIK {
     }
 
 
-    public Coord xy(){
+    public Coord forwardKinematics(){
         //Prep the units
         var armlen=arm.getLength().plus(extendo.getDistance()).in(Inches);
         var wristlen=wrist.getLength().in(Inches);
@@ -65,7 +66,7 @@ public class ArmIK {
         return c;
     }
 
-    public Pose ik(DoubleSupplier xpos, DoubleSupplier ypos, DoubleSupplier degrees){
+    public Pose calculateIK(DoubleSupplier xpos, DoubleSupplier ypos, DoubleSupplier degrees){
         //prep the units 
         var wtheta=Degrees.of(degrees.getAsDouble()).in(Radian);
         var wlength=wrist.getLength().in(Inches);
@@ -90,7 +91,7 @@ public class ArmIK {
     }
 
 
-    public Command runIK(Supplier<Pose> poseSupplier){
+    public Command setPose(Supplier<Pose> poseSupplier){
         return Commands.parallel(
             arm.setAngle(()->poseSupplier.get().arm),
             wrist.setAngleFromGround(()->poseSupplier.get().wrist),
@@ -99,7 +100,7 @@ public class ArmIK {
     }
 
     public Command runIK(DoubleSupplier xpos, DoubleSupplier ypos, DoubleSupplier wristDegrees){
-        return runIK(()->ik(xpos,ypos,wristDegrees));
+        return setPose(()->calculateIK(xpos,ypos,wristDegrees));
     }
 
     //TODO This whole process currently does not work :<
@@ -110,7 +111,7 @@ public class ArmIK {
         },
         ()->{
             //calculate a position in line with our max velocity to the point
-            var c = xy();
+            var c = forwardKinematics();
             var currentposition = new Translation2d(c.x, c.y);
             var goal = poseSupplier.get();
 
@@ -124,7 +125,7 @@ public class ArmIK {
             goal=currentposition;
             
             //Do some IK now
-            var pose= ik(goal::getX, goal::getY, ()->angle.get().in(Degree));
+            var pose= calculateIK(goal::getX, goal::getY, ()->angle.get().in(Degree));
 
 
             arm.setPID(()->pose.arm);
@@ -136,12 +137,12 @@ public class ArmIK {
 
     //Get a end effector distance to target position
     public double getDistance(double xInches, double yInches){
-        var xy=xy();
+        var xy=forwardKinematics();
         return new Translation2d(xy.x,xy.y).getDistance(new Translation2d(xInches, yInches));
     }
 
     public void updateKinematics(){
-        var c=xy();
+        var c=forwardKinematics();
         SmartDashboard.putNumber("kinematics/x", c.x );
         SmartDashboard.putNumber("kinematics/y", c.y );
         SmartDashboard.putNumber("kinematics/a", wrist.getAngleGround().in(Degree) );

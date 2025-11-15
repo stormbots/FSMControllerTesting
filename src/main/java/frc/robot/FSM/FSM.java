@@ -712,17 +712,4 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     public void setLogLevel(Level loglevel){
         log.setLevel(loglevel);
     }
-
-
-    //TODO: Missing useful items
-    //"distance" function for the FSM to attempt state recovery
-    //Automatically build a SendableChooser start->finish and show the paths so it's easy to proofread
-
-    //Optional config to ignore enable/disable when scheduling
-    //TODO: Better handle generated command methods. While these do exit, they're not predictable.
-    //  Specifically, if an exit condition is attached to a sequence, but that sequence is interrupted,
-    //  it may trigger an onComplete in the wrong state or at an unexpected time, causing significant confusion. 
-    //  Setting FSM as a subsystem to allow slef commands to use requires mutex is probably the simplest option,
-    //  but other structures may need to be considered.
-
 }
