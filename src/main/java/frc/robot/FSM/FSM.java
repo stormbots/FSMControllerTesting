@@ -2,7 +2,6 @@ package frc.robot.FSM;
 
 import java.io.OutputStream;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -25,9 +24,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.robot.Dijkstra;
 
 public class FSM<T extends Enum<T>>  implements Sendable{
 
@@ -162,7 +159,7 @@ public class FSM<T extends Enum<T>>  implements Sendable{
      */
     private boolean checkAutoTransitions(){
         var activeStateComplete=activeState.goalCompletionCondition.getAsBoolean();
-        for(var transition: activeState.autotransitions){
+        for(var transition: activeState.autoWhenComplete){
             if( (activeStateComplete || transition.requiresCompletion==false) && transition.condition.getAsBoolean()){
                 log.info(String.format("Auto Transition from: %s to %s",
                     activeState.name,
@@ -575,65 +572,6 @@ public class FSM<T extends Enum<T>>  implements Sendable{
     /** Enable the state machine, then force the provided state */
     public Command enable(T forcedState){
         return forceState(forcedState).beforeStarting(()->enabled=true);
-    }
-
-
-    /** Container for state data.
-     */
-    public static class FSMState<T extends Enum<T>>{
-        public Supplier<Command> commandSupplier = ()->new InstantCommand();
-        public BooleanSupplier transitionCompletionCondition=()->false;
-        public BooleanSupplier goalCompletionCondition=()->false;
-        public T name;
-        public Optional<DoubleSupplier> recoveryCost=Optional.empty();
-
-        public class AutoTransition<T>{
-            public BooleanSupplier condition;
-            public T destination;
-            public Boolean requiresCompletion;
-            public String toString(){
-                return String.format("AT(%s->%s|()->%s|()->%s && %s)",
-                    name.toString(),
-                    destination.toString(),
-                    condition.getAsBoolean(),
-                    goalCompletionCondition.getAsBoolean(),
-                    requiresCompletion
-                );
-            }
-        }
-        public ArrayList<AutoTransition<T>> autotransitions = new ArrayList<>();
-
-        /**
-         * Provide a state with name, command, and exit conditions.
-         * @param name
-         * @param commandSupplier
-         * @param transitionCompletionCondition
-         */
-        public FSMState(
-                T name,
-                Supplier<Command> commandSupplier,
-                BooleanSupplier transitionCompletionCondition,
-                BooleanSupplier goalCompletionCondition
-            ){
-            this.name = name;
-            this.commandSupplier = commandSupplier;
-            this.transitionCompletionCondition = transitionCompletionCondition;
-            this.goalCompletionCondition = goalCompletionCondition;
-        }
-
-        /**
-         * Configure an automatic transition from this state to another
-         * @param destination
-         * @param condition the boolean condition under which we transition
-         * @param requiresStateCompletion Whether we also require the state's completion condition to be met.
-         */
-        public void addAutoTransition(T destination, BooleanSupplier condition, Boolean requiresStateCompletion){
-            var t = new AutoTransition<T>();
-            t.destination = destination;
-            t.condition = condition;
-            t.requiresCompletion=requiresStateCompletion;
-            autotransitions.add(t);
-        }
     }
 
     /**
