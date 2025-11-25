@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.DijkstraV2.Test;
 import frc.robot.FSM.FSM;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Extendo.Extendo;
@@ -37,6 +38,11 @@ public class RobotContainer {
   final static Wrist wrist = new Wrist(arm::getState);
   final static Rollers rollers = new Rollers();
   final static Extendo extendo = new Extendo(arm::getState);
+
+
+
+  Test test = new Test();
+
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandXboxController driver = new CommandXboxController(0);
@@ -108,6 +114,7 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
+    if(true)return Commands.none();
     
     // if(true) return Commands.sequence(
     //   fsm.setWait(BotState.IntakeStation).until(rollers.isHoldingCoral),

@@ -61,7 +61,7 @@ public class DijkstraV2<T extends Enum<T>> {
 
         //     9      while Q is not empty:
         while(Q.isEmpty()==false){
-            Vertex<T> u = Q.stream().min((a,b)->Double.compare(a.dist,b.dist)).get(); //TODO Unchecked optional unwrap
+            Vertex<T> u = Q.stream().min((a,b)->Double.compare(a.dist, b.dist)).get(); //TODO Unchecked optional unwrap
             Q.remove(u);
 
             //u is current node. 
