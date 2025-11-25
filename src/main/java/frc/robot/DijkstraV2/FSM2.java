@@ -2,24 +2,34 @@ package frc.robot.DijkstraV2;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
+
+import edu.wpi.first.wpilibj.Timer;
 
 public class FSM2<T extends Enum<T>>{
     State<T> state;
     T stateName;
     T nextState;
     HashMap<T,State<T>> stateMap=new HashMap<>();
+    double stateEntryTime;
 
     class Transition<T>{
         T destination;
         BooleanSupplier condition;
     }
+    class TimedTransition<T>{
+        T destination;
+        Function<Double,Boolean> condition;
+    }
 
     class State<T>{
         /** The core logic of the state */
         Runnable logic = ()->{};
-        /** Transition conditions that can occour any time in this state  */
+        /** Transition conditions that check external logic  */
         ArrayList<Transition<T>> transitions = new ArrayList<>();
+        /** Transition conditions that can interface with a state timer  */
+        ArrayList<TimedTransition<T>> timedTransitions = new ArrayList<>();
         //Pass in a switch
         ArrayList<Supplier<T>> selectors = new ArrayList<>();
 
@@ -27,6 +37,14 @@ public class FSM2<T extends Enum<T>>{
 
         public State<T> addTransition(T destinationState, BooleanSupplier transitionCondition){
             transitions.add(new Transition<>(){{
+                destination=destinationState;
+                condition=transitionCondition;
+            }});
+            return this;
+        }
+        /** Add a state transition that interacts with the current state runtime (in seconds) */
+        public State<T> addTimerTransition(T destinationState, Function<Double,Boolean> transitionCondition){
+            timedTransitions.add(new TimedTransition<T>(){{
                 destination=destinationState;
                 condition=transitionCondition;
             }});
@@ -54,6 +72,11 @@ public class FSM2<T extends Enum<T>>{
                 nextState=transition.destination;
             }
         }
+        for(var transition : state.timedTransitions){
+            if(transition.condition.apply(Timer.getFPGATimestamp()-stateEntryTime)){
+                nextState=transition.destination;
+            }
+        }
         for(var selector : state.selectors){
             var newstate=selector.get();
             if(newstate == null) break; //TODO log as error?
@@ -71,6 +94,7 @@ public class FSM2<T extends Enum<T>>{
             );
             state=stateMap.get(nextState);
             stateName=nextState;
+            stateEntryTime=Timer.getFPGATimestamp();
         }
         state=stateMap.get(nextState);
     }
