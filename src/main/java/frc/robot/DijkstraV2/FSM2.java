@@ -33,7 +33,8 @@ public class FSM2<T extends Enum<T>>{
         //Pass in a switch
         ArrayList<Supplier<T>> selectors = new ArrayList<>();
 
-        //TODO: Add onEntry and onExit runnables arrays?
+        ArrayList<Runnable> onEntry = new ArrayList<>();
+        ArrayList<Runnable> onExit = new ArrayList<>();
 
         public State<T> addTransition(T destinationState, BooleanSupplier transitionCondition){
             transitions.add(new Transition<>(){{
@@ -50,8 +51,19 @@ public class FSM2<T extends Enum<T>>{
             }});
             return this;
         }
+        /** Add a function that directly computes the next state*/
         public State<T> addSelector(Supplier<T> selectorFunction){
             selectors.add(selectorFunction);
+            return this;
+        }
+        //** Add a function that fires when entering the state */
+        public State<T> onEntry(Runnable logic){
+            onEntry.add(logic);
+            return this;
+        }
+        //** Add a function that fires when exiting the state */
+        public State<T> onExit(Runnable logic){
+            onExit.add(logic);
             return this;
         }
     }
@@ -87,13 +99,19 @@ public class FSM2<T extends Enum<T>>{
         if(stateMap.containsKey(nextState)==false) return; //TODO log as error
 
         if(nextState!=stateName){
-            System.out.printf("%s::%s->%s\n",
+            for(var exit : state.onExit) exit.run();
+
+            System.out.printf("%s::%s->%s (%.2fs)\n",
                 stateName.getClass().getSimpleName(),
                 stateName,
-                nextState
+                nextState,
+                Timer.getFPGATimestamp()-stateEntryTime
             );
             state=stateMap.get(nextState);
             stateName=nextState;
+
+            for(var entry : state.onEntry) entry.run();
+
             stateEntryTime=Timer.getFPGATimestamp();
         }
         state=stateMap.get(nextState);
