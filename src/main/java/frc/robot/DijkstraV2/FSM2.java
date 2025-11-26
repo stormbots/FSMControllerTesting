@@ -14,15 +14,18 @@ public class FSM2<T extends Enum<T>>{
     HashMap<T,State<T>> stateMap=new HashMap<>();
     double stateEntryTime;
 
+    /** Transition with a simple condition */
     class Transition<T>{
         T destination;
         BooleanSupplier condition;
     }
+    /** Transition where the condition is provided the runtime of the current state (in seconds) */
     class TimedTransition<T>{
         T destination;
         Function<Double,Boolean> condition;
     }
 
+    /** Class containing state logic and transitions. */
     class State<T>{
         /** The core logic of the state */
         Runnable logic = ()->{};
@@ -117,7 +120,10 @@ public class FSM2<T extends Enum<T>>{
         state=stateMap.get(nextState);
     }
 
-    /** Validate the state machine's completeness. Throw errors if not.*/
+    /** Validate the state machine's completeness. <br/>
+     * Does nothing if all states are defined. <br/>
+     * If any states are missing, will throw an exception, halting robot code.
+     */
     public void validate(){
         String report="";
 
@@ -133,17 +139,19 @@ public class FSM2<T extends Enum<T>>{
         throw(new Error(report));
     }
 
+    /** Create a new state, returning it so that transitions can be added */
     State<T> addState(T name, Runnable stateLogic){
         var newstate=new State<T>(){{logic=stateLogic;}};
         stateMap.put(name, newstate);
         return newstate;
     }
 
-    /** Grab the state for the provided value.*/
+    /** Return the indicated state, or an empty state if one was not created yet */
     State<T> getState(T name){
         return stateMap.getOrDefault(name, new State<>());
     }
 
+    /** Set the state machine's state to the indicated value */
     void setState(T name){
         nextState=name;
     }
