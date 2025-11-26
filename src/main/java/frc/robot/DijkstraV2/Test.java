@@ -5,6 +5,7 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
@@ -54,7 +55,8 @@ public class Test {
         alignForward,
         loaded,
         unloaded,
-        scoring
+        scoring,
+        disabled,
     }
     void setUpCoralHandler(){
         var motor = new SparkFlex(1, MotorType.kBrushless);
@@ -85,12 +87,16 @@ public class Test {
         coral.addState(CS.unloaded, ()->motor.set(0.0))
         .addTransition(CS.alignReverse, coralsensor);
 
+        coral.addState(CS.disabled, ()->motor.set(0.0));
+
         coral.validate();
 
         //External API : report status based on states
         // Trigger isCoralLoaded=new Trigger(()->coral.inState(CS.unloaded));
         // Trigger isCoralEmpty=new Trigger(()->coral.inState(CS.unloaded)).negate();
 
-        new Trigger(DriverStation::isEnabled).whileTrue(new RunCommand(()->coral.run()));
+        new Trigger(DriverStation::isEnabled).whileTrue(new RunCommand(()->coral.run()).ignoringDisable(true));
+
+        SmartDashboard.putData("FSM::coral",coral.getSelectableChooser());
     }
 }
