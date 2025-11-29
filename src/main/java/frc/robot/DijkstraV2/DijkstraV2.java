@@ -32,35 +32,45 @@ import java.util.function.DoubleSupplier;
 public class DijkstraV2<T extends Enum<T>> {
     /** Holds the traversal costs between any given nodes */
     class Edge<T>{
-        public T source;
+        public final T source;
+        public final T destination;
         public final double cost;
         public final DoubleSupplier dynamicCost;
-        public T destination;
         public Edge(T source, T dest, double cost){
             this.source=source; this.cost=cost; this.destination=dest; this.dynamicCost=()->this.cost;
         };
         public Edge(T source, T dest, double fixedCost, DoubleSupplier dynamicCost){
             this.source=source; this.cost=fixedCost; this.destination=dest; this.dynamicCost=dynamicCost;
         };
+        public String toString(){
+            return String.format("Edge[%s->%s](%.2f)",source,destination,cost);
+        }
     }
 
     /** The Vertex describes the graph nodes, and during traversal holds the costs 
      * related to travelling to any particular node.
       */
     class Vertex<T> implements Comparable<Vertex<T>>{
-        public T id;
+        public final T id;
         public double cost=9999;
         public T prev=null;
+        public final DoubleSupplier costfunction;
+
         @Override
         public int compareTo(Vertex<T> o) {
             return Double.compare(cost,o.cost);
         }
-        public Vertex(T id){this.id=id;}
+        public Vertex(T id){this.id=id;this.costfunction=()->this.cost;}
+        public Vertex(T id, DoubleSupplier costfunction){this.id=id;this.costfunction=costfunction;}
+        public String toString(){
+            return String.format("Vertex[%s]",id);
+        }
+
     }
 
     //The core datastructures needed for the graph
     HashMap<T,Vertex<T>> nodes = new HashMap<>();
-    HashMap<Vertex<T>,ArrayList<Edge<T>>> edges = new HashMap<>();
+    HashMap<Vertex<T>,HashMap<Vertex<T>,Edge<T>>> edges = new HashMap<>();
 
     /*
      * To minimize java garbage collection issues, these variables 
@@ -69,13 +79,20 @@ public class DijkstraV2<T extends Enum<T>> {
     */
     private ArrayList<T> path;
     private ArrayList<Vertex<T>> unvisited;
-    private ArrayList<Edge<T>> emptyEdgeList = new ArrayList<>(0);
+    private HashMap<Vertex<T>,Edge<T>> emptyEdgeList = new HashMap<>(0);
 
 
     public DijkstraV2(T instance){
-        var capacity = instance.getClass().getEnumConstants().length;
+        var capacity = instance.getClass().getEnumConstants().length+1;
         path=new ArrayList<>(capacity);
         unvisited=new ArrayList<>(capacity);
+
+        for(var t : instance.getClass().getEnumConstants()){
+            //Initialize nodes
+            var v = new Vertex<T>((T)t);
+            nodes.put((T)t, v );
+            edges.put(v, new HashMap<>());
+        }
     }
     
 
@@ -101,7 +118,7 @@ public class DijkstraV2<T extends Enum<T>> {
             var u = unvisited.stream().min((a,b)->Double.compare(a.cost, b.cost)).get(); 
             unvisited.remove(u);
 
-            for(var e : edges.getOrDefault(u,emptyEdgeList)){
+            for(var e : edges.get(u).values()){
                 var v = nodes.get(e.destination);
                 if(unvisited.contains(v)==false)continue;
                 var alt = u.cost+e.cost;
@@ -130,38 +147,30 @@ public class DijkstraV2<T extends Enum<T>> {
         return path;
     }
 
-    /** Add a uni-directional connection with a dynamic initial cost*/
-    private DijkstraV2<T> addConnection(T source, T dest, double cost, DoubleSupplier costFunction){
-        var va=nodes.getOrDefault(source, new Vertex<T>(source));
-        var vb=nodes.getOrDefault(dest, new Vertex<T>(dest));
-        //Handled via null checking to minimize scope captures when creating states
-        var edge = costFunction==null
-            ? new Edge<T>(source, dest, cost)
-            : new Edge<T>(source, dest, cost, costFunction);
-        nodes.putIfAbsent(source, va );
-        nodes.putIfAbsent(dest, vb );
-        edges.putIfAbsent(va, new ArrayList<>());
-        edges.get(va).add(edge);
+    /** Add a uni-directional connection with a dynamic initial cost. 
+     * Will not overwrite existing edges or their costs. <br/>
+     * Use {@link #getConnection(Enum, Enum)} to modify existing edges.
+    */
+    public DijkstraV2<T> addConnection(T source, T dest, double cost){
+        var va=nodes.get(source);
+        var vb=nodes.get(dest);
+        var edge = new Edge<T>(source, dest, cost);
+        edges.get(va).putIfAbsent(vb,edge);
         return this;
     }
 
     /** Return the connection between these points for further modification */
     public Edge<T> getConnection(T source, T dest){
-        for(var e : edges.getOrDefault(source,new ArrayList<>())){
+        for(var e : edges.getOrDefault(source,new HashMap<>()).values()){
             if(e.destination==dest) return e;
         }
         throw(new Error(String.format("Connection (%s->%s) not found",source,dest)));
     }
 
-    /** Add a uni-directional connection from a to b */
-    public DijkstraV2<T> addConnection(T source, T dest, double cost){
-        return addConnection(source, dest, cost, null);
-    }
-
     /** Add connections between the two nodes*/
     public DijkstraV2<T> addBidirectionalConnection(T a, T b, double cost){
-        addConnection(a, b, cost, null);
-        addConnection(b, a, cost, null);
+        addConnection(a, b, cost);
+        addConnection(b, a, cost);
         return this;
     }
 
