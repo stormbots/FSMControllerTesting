@@ -11,52 +11,20 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 public class Test {
-    enum Toy{a,b,c,d};
-    FSM2<Toy> fsm = new FSM2<>(Toy.a);
 
     public Test(){
         System.out.println("Starting coral handler");
-        setUpCoralHandler();
+        // setUpCoralHandler();
+        djtest();
     }
 
-    public void setUpToy(){
-
-        System.out.println("Creating test toy");
-        fsm.addState(Toy.a, ()->{})
-        // .addTransition(Toy.b, ()->Timer.getFPGATimestamp()%3>1);
-        .addTimerTransition(Toy.b, (t)->t>1);
-
-        fsm.addState(Toy.b, ()->{})
-        // .addTransition(Toy.c, ()->Timer.getFPGATimestamp()%3<1);
-        .addTimerTransition(Toy.c, (t)->t>1)
-        .onEntry(()->System.out.print("2B"))
-        .onExit(()->System.out.println("...not 2B"))
-        ;
-
-        fsm.addState(Toy.c, ()->{})
-        // .addTransition(Toy.d, ()->Timer.getFPGATimestamp()%3>1);
-        .addTimerTransition(Toy.d, (t)->t>1);
-
-        fsm.addState(Toy.d, ()->{})
-        // .addSelector(()->null)
-        .addSelector(()->Timer.getFPGATimestamp()%2==0 ? Toy.a : Toy.b);
-
-        fsm.validate();
-
-        new Trigger(DriverStation::isEnabled).onTrue(Commands.run(()->{
-            fsm.run();
-        }).ignoringDisable(true));
-
-    }
-    
     enum CS{
         intaking,
         alignReverse,
         alignForward,
         loaded,
         unloaded,
-        scoring,
-        disabled,
+        scoring
     }
     void setUpCoralHandler(){
         var motor = new SparkFlex(1, MotorType.kBrushless);
@@ -87,16 +55,45 @@ public class Test {
         coral.addState(CS.unloaded, ()->motor.set(0.0))
         .addTransition(CS.alignReverse, coralsensor);
 
-        coral.addState(CS.disabled, ()->motor.set(0.0));
-
         coral.validate();
 
-        //External API : report status based on states
-        // Trigger isCoralLoaded=new Trigger(()->coral.inState(CS.unloaded));
-        // Trigger isCoralEmpty=new Trigger(()->coral.inState(CS.unloaded)).negate();
+        //External API can be defined by checking groups of states
+        Trigger isCoralLoaded=new Trigger(()->coral.inState(CS.unloaded)).negate();
+        Trigger isCoralLoading=new Trigger(()->coral.inState(CS.alignForward,CS.alignReverse));
+        Trigger isCoralEmpty=new Trigger(()->coral.inState(CS.unloaded));
 
         new Trigger(DriverStation::isEnabled).whileTrue(new RunCommand(()->coral.run()).ignoringDisable(true));
 
         SmartDashboard.putData("FSM::coral",coral.getSelectableChooser());
+    }
+
+
+    enum Bowtie{
+        a,b,c,d,e,f,oneway
+    }
+    void djtest(){
+        var dj = new DijkstraV2<Bowtie>(Bowtie.a);
+
+        dj.connect(Bowtie.a, Bowtie.b, 1);
+        dj.connect(Bowtie.b, Bowtie.c, 1);
+        dj.connect(Bowtie.c, Bowtie.a, 1);
+
+        dj.connect(Bowtie.d, Bowtie.e, 1);
+        dj.connect(Bowtie.e, Bowtie.f, 1);
+        dj.connect(Bowtie.f, Bowtie.d, 1);
+
+        dj.connect(Bowtie.c, Bowtie.d, 1);
+        dj.connect(Bowtie.d, Bowtie.c, 1);
+        dj.connect(Bowtie.f, Bowtie.oneway, 1);
+
+        dj.compute(Bowtie.a, Bowtie.c);
+        dj.compute(Bowtie.c, Bowtie.a);
+        dj.compute(Bowtie.a, Bowtie.f);
+        dj.compute(Bowtie.c, Bowtie.d);
+        dj.compute(Bowtie.f, Bowtie.a);
+        dj.compute(Bowtie.b, Bowtie.oneway);
+        dj.compute(Bowtie.oneway, Bowtie.b);
+
+
     }
 }
