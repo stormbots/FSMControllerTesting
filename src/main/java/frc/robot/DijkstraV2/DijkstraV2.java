@@ -26,6 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.function.DoubleSupplier;
 
+/** 
+ * A class to compute path traversal across a state graph.
+ */
 public class DijkstraV2<T extends Enum<T>> {
     /** Holds the traversal costs between any given nodes */
     class Edge<T>{
@@ -76,7 +79,7 @@ public class DijkstraV2<T extends Enum<T>> {
     }
     
 
-    List<T> compute(T source, T destination){
+    List<T> findPath(T source, T destination){
         //Clean up our storage 
         path.clear();
         unvisited.clear();
@@ -127,21 +130,66 @@ public class DijkstraV2<T extends Enum<T>> {
         return path;
     }
 
-    /** Add the provided states and transitions with the provided costs */
-    public DijkstraV2<T> connect(T a, T b, double cost, DoubleSupplier costFunction){
-        var va=nodes.getOrDefault(a, new Vertex<T>(a));
-        var vb=nodes.getOrDefault(b, new Vertex<T>(b));
+    /** Add a uni-directional connection with a dynamic initial cost*/
+    private DijkstraV2<T> addConnection(T source, T dest, double cost, DoubleSupplier costFunction){
+        var va=nodes.getOrDefault(source, new Vertex<T>(source));
+        var vb=nodes.getOrDefault(dest, new Vertex<T>(dest));
+        //Handled via null checking to minimize scope captures when creating states
         var edge = costFunction==null
-            ? new Edge<T>(a, b, cost)
-            : new Edge<T>(a, b, cost, costFunction);
-        nodes.putIfAbsent(a, va );
-        nodes.putIfAbsent(b, vb );
+            ? new Edge<T>(source, dest, cost)
+            : new Edge<T>(source, dest, cost, costFunction);
+        nodes.putIfAbsent(source, va );
+        nodes.putIfAbsent(dest, vb );
         edges.putIfAbsent(va, new ArrayList<>());
         edges.get(va).add(edge);
         return this;
     }
 
-    public DijkstraV2<T> connect(T a, T b, double cost){
-        return connect(a, b, cost, null);
+    /** Return the connection between these points for further modification */
+    public Edge<T> getConnection(T source, T dest){
+        for(var e : edges.getOrDefault(source,new ArrayList<>())){
+            if(e.destination==dest) return e;
+        }
+        throw(new Error(String.format("Connection (%s->%s) not found",source,dest)));
     }
+
+    /** Add a uni-directional connection from a to b */
+    public DijkstraV2<T> addConnection(T source, T dest, double cost){
+        return addConnection(source, dest, cost, null);
+    }
+
+    /** Add connections between the two nodes*/
+    public DijkstraV2<T> addBidirectionalConnection(T a, T b, double cost){
+        addConnection(a, b, cost, null);
+        addConnection(b, a, cost, null);
+        return this;
+    }
+
+    /** Create connections between several points in a sequence with identical costs.
+     * Syntactic sugar for multiple {@link #addConnection(Enum, Enum, double)} calls.
+     */
+    public DijkstraV2<T> addDirectionalSequence(double cost, T... states){
+        if(states.length<2){
+            throw(new Error("Need 2 or more nodes to form connections"));
+        }
+        for(var i=1;i<states.length; i++){
+            addConnection(states[i-1],states[i],cost);
+        }
+        return this;
+    }
+
+    /** Create connections between several points in a sequence with identical costs.
+     * Syntactic sugar for multiple {@link #addBidirectionalConnection(Enum, Enum, double)} calls.
+     */
+    public DijkstraV2<T> addBidirectionalSequence(double cost, T... states){
+        if(states.length<2){
+            throw(new Error("Need 2 or more nodes to form connections"));
+        }
+        for(var i=1;i<states.length; i++){
+            addConnection(states[i-1],states[i],cost);
+            addConnection(states[i],states[i-1],cost);
+        }
+        return this;
+    }
+
 }

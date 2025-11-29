@@ -74,26 +74,23 @@ public class Test {
     void djtest(){
         var dj = new DijkstraV2<Bowtie>(Bowtie.a);
 
-        dj.connect(Bowtie.a, Bowtie.b, 1);
-        dj.connect(Bowtie.b, Bowtie.c, 1);
-        dj.connect(Bowtie.c, Bowtie.a, 1);
+        dj.addDirectionalSequence(1,Bowtie.a,Bowtie.b,Bowtie.c,Bowtie.a);
+        dj.addConnection(Bowtie.d, Bowtie.e, 1);
+        dj.addConnection(Bowtie.e, Bowtie.f, 1);
+        dj.addConnection(Bowtie.f, Bowtie.d, 1);
 
-        dj.connect(Bowtie.d, Bowtie.e, 1);
-        dj.connect(Bowtie.e, Bowtie.f, 1);
-        dj.connect(Bowtie.f, Bowtie.d, 1);
+        dj.addBidirectionalConnection(Bowtie.c, Bowtie.d, 1);
+        dj.addConnection(Bowtie.f, Bowtie.oneway, 1);
 
-        dj.connect(Bowtie.c, Bowtie.d, 1);
-        dj.connect(Bowtie.d, Bowtie.c, 1);
-        dj.connect(Bowtie.f, Bowtie.oneway, 1);
-
-        dj.compute(Bowtie.a, Bowtie.c);
-        dj.compute(Bowtie.c, Bowtie.a);
-        dj.compute(Bowtie.a, Bowtie.f);
-        dj.compute(Bowtie.c, Bowtie.d);
-        dj.compute(Bowtie.f, Bowtie.a);
-        dj.compute(Bowtie.b, Bowtie.oneway);
-        dj.compute(Bowtie.oneway, Bowtie.b);
-
+        dj.findPath(Bowtie.a, Bowtie.c);
+        dj.findPath(Bowtie.c, Bowtie.a);
+        dj.findPath(Bowtie.a, Bowtie.f);
+        dj.findPath(Bowtie.c, Bowtie.d);
+        dj.findPath(Bowtie.f, Bowtie.a);
+        dj.findPath(Bowtie.f, Bowtie.f);
+        dj.findPath(Bowtie.b, Bowtie.oneway);
+        dj.findPath(Bowtie.oneway, Bowtie.b);
+    }
 
     }
 }
