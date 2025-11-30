@@ -68,29 +68,57 @@ public class Test {
     }
 
 
+    void benchmark(DijkstraV2<Bowtie> path){
+        var counts=0;
+        var timer=Timer.getFPGATimestamp();
+
+        for(var a : Bowtie.class.getEnumConstants()){
+            for(var b : Bowtie.class.getEnumConstants()){
+                counts++;
+                path.findPath(a, b);
+            }
+        }
+        timer=Timer.getFPGATimestamp()-timer;
+        System.out.printf("Calculated %s paths in %.5fs\n", counts,timer);
+        System.out.printf("approx %.5fs per path\n", timer/counts);
+        System.out.printf("approx %.5f%% of loop time\n", (timer/counts)/0.02);
+    }
+
     enum Bowtie{
-        a,b,c,d,e,f,oneway
+        lbl,lbr,lc,ltr,ltl,
+        rc,rbl,rbr,rtr,rtl,
+        ct,cb
     }
     void djtest(){
-        var dj = new DijkstraV2<Bowtie>(Bowtie.a);
+        var dj = new DijkstraV2<Bowtie>(Bowtie.rc);
 
-        dj.addDirectionalSequence(1,Bowtie.a,Bowtie.b,Bowtie.c,Bowtie.a);
-        dj.addConnection(Bowtie.d, Bowtie.e, 1);
-        dj.addConnection(Bowtie.e, Bowtie.f, 1);
-        dj.addConnection(Bowtie.f, Bowtie.d, 1);
+        dj.addBidirectionalSequence(2,Bowtie.lc,Bowtie.ltr,Bowtie.ltl,Bowtie.lbl,Bowtie.lbr,Bowtie.lc);
+        dj.addDirectionalSequence(5,Bowtie.lc,Bowtie.cb,Bowtie.rc,Bowtie.ct);
+        dj.addDirectionalSequence(1,Bowtie.rc,Bowtie.rtl,Bowtie.rtr,Bowtie.rbr,Bowtie.rbl,Bowtie.rc);
 
-        dj.addBidirectionalConnection(Bowtie.c, Bowtie.d, 1);
-        dj.addConnection(Bowtie.f, Bowtie.oneway, 1);
+        benchmark(dj);
+        benchmark(dj);
+        benchmark(dj);
 
-        dj.findPath(Bowtie.a, Bowtie.c);
-        dj.findPath(Bowtie.c, Bowtie.a);
-        dj.findPath(Bowtie.a, Bowtie.f);
-        dj.findPath(Bowtie.c, Bowtie.d);
-        dj.findPath(Bowtie.f, Bowtie.a);
-        dj.findPath(Bowtie.f, Bowtie.f);
-        dj.findPath(Bowtie.b, Bowtie.oneway);
-        dj.findPath(Bowtie.oneway, Bowtie.b);
+        System.out.println(dj.edges);
     }
+
+    enum Arm{
+        bootup,
+        stow,
+        climb,
+        l1,
+        l2,
+        l3,
+        l4,
+        station
+    }
+    void armtest(){
+        var dj=new DijkstraV2<>(Arm.bootup);
+
+        dj.addBidirectionalSequence(1, Arm.stow,Arm.l1,Arm.l2,Arm.l3,Arm.l4);
+        dj.addBidirectionalSequence(1, Arm.stow, Arm.climb);
+        dj.addBidirectionalSequence(1, Arm.stow, Arm.station);
 
     }
 }

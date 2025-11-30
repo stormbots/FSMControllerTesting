@@ -70,7 +70,7 @@ public class DijkstraV2<T extends Enum<T>> {
 
     //The core datastructures needed for the graph
     HashMap<T,Vertex<T>> nodes = new HashMap<>();
-    HashMap<Vertex<T>,HashMap<Vertex<T>,Edge<T>>> edges = new HashMap<>();
+    HashMap<T,HashMap<T,Edge<T>>> edges = new HashMap<>();
 
     /*
      * To minimize java garbage collection issues, these variables 
@@ -79,19 +79,15 @@ public class DijkstraV2<T extends Enum<T>> {
     */
     private ArrayList<T> path;
     private ArrayList<Vertex<T>> unvisited;
-    private HashMap<Vertex<T>,Edge<T>> emptyEdgeList = new HashMap<>(0);
-
 
     public DijkstraV2(T instance){
-        var capacity = instance.getClass().getEnumConstants().length+1;
-        path=new ArrayList<>(capacity);
-        unvisited=new ArrayList<>(capacity);
+        var vertexCount = instance.getClass().getEnumConstants().length;
+        path=new ArrayList<>(vertexCount+1); //+1 to allow potentially pushing a source node or loop
+        unvisited=new ArrayList<>(vertexCount);
 
         for(var t : instance.getClass().getEnumConstants()){
-            //Initialize nodes
-            var v = new Vertex<T>((T)t);
-            nodes.put((T)t, v );
-            edges.put(v, new HashMap<>());
+            nodes.put((T)t, new Vertex<T>((T)t) );
+            edges.put((T)t, new HashMap<>());
         }
     }
     
@@ -113,12 +109,12 @@ public class DijkstraV2<T extends Enum<T>> {
         });
         nodes.get(source).cost=0;
         
-        //The Dijkstra magic
+        //The Dijkstra magic: Calculate travel costs for nodes
         while(unvisited.size()>0){
             var u = unvisited.stream().min((a,b)->Double.compare(a.cost, b.cost)).get(); 
             unvisited.remove(u);
 
-            for(var e : edges.get(u).values()){
+            for(var e : edges.get(u.id).values()){
                 var v = nodes.get(e.destination);
                 if(unvisited.contains(v)==false)continue;
                 var alt = u.cost+e.cost;
@@ -128,7 +124,7 @@ public class DijkstraV2<T extends Enum<T>> {
                 }
             }
         }
-
+        //We now follow the chain of lowest costs back to our source 
         var current = destination;
         while(true){
             path.add(current);
@@ -143,7 +139,7 @@ public class DijkstraV2<T extends Enum<T>> {
         //Dijkstra backtracks from dest to src, so reverse it for the correct route
         Collections.reverse(path);
 
-        System.out.printf("Path(%s,%s) -> %s \n",source,destination,path);
+        // System.out.printf("Path(%s,%s) -> %s \n",source,destination,path);
         return path;
     }
 
@@ -152,10 +148,7 @@ public class DijkstraV2<T extends Enum<T>> {
      * Use {@link #getConnection(Enum, Enum)} to modify existing edges.
     */
     public DijkstraV2<T> addConnection(T source, T dest, double cost){
-        var va=nodes.get(source);
-        var vb=nodes.get(dest);
-        var edge = new Edge<T>(source, dest, cost);
-        edges.get(va).putIfAbsent(vb,edge);
+        edges.get(source).putIfAbsent(dest,new Edge<T>(source, dest, cost));
         return this;
     }
 
