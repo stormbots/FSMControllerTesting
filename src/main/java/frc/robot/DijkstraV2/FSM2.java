@@ -12,13 +12,16 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class FSM2<T extends Enum<T>> implements Sendable{
-    State<T> state;
-    T initialState;
-    T stateName;
-    T nextState;
-    HashMap<T,State<T>> stateMap=new HashMap<>();
-    double stateEntryTime;
-    FSM2<T> kind; //Attempt to streamline a long annoying line of code i have to use often
+    /** Initial state the FSM boots into, and used for resets */
+    private T initialState;
+    /** current state mode within the FSM */
+    private T stateName;
+    /** The state to transition into */
+    private T nextState;
+    /** Placeholder for the current state object, which is updated according to {@link #stateName}*/
+    private State<T> state;
+    private HashMap<T,State<T>> stateMap=new HashMap<>();
+    private double stateEntryTime;
 
 
     /** Transition with a simple condition */
@@ -90,7 +93,7 @@ public class FSM2<T extends Enum<T>> implements Sendable{
     }
 
     /** Step through the state machine logic, updating as indicated by state transitions */
-    void run(){
+    void update(){
         state.logic.run();
 
         //Determine our next state
@@ -142,6 +145,11 @@ public class FSM2<T extends Enum<T>> implements Sendable{
     /** Return the indicated state, or an empty state if one was not created yet */
     State<T> getState(T name){
         return stateMap.getOrDefault(name, new State<>());
+    }
+
+    /** Return the current operating state */
+    T getState(){
+        return stateName;
     }
 
     /** Set the state machine's state to the indicated value */

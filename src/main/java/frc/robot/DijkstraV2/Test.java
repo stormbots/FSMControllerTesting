@@ -9,6 +9,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.DijkTesting.BuildBuild;
+import frc.robot.DijkTesting.InstInst;
+import frc.robot.DijkTesting.TestTest;
+import frc.robot.DijkTesting.WorkingComboBuilderKinda;
+import frc.robot.DijkTesting.WorkingComboBuilderKinda.Instance;
 
 public class Test {
 
@@ -16,7 +21,36 @@ public class Test {
         System.out.println("Starting coral handler");
         // setUpCoralHandler();
         djtest();
+        //This sucks because the first part is nonobvious and ide fails to help
+        WorkingComboBuilderKinda<CS>.Instance<CS> instance = new WorkingComboBuilderKinda<CS>().build();//gross
+        
+        //This works but isn't exactly less clunky
+        // InstInst<CS> trial = new BuildBuild<CS>().method().build();
+        // InstInst<CS> test2 = new InstInst<>();
+        // TestTest<CS> trial = new TestTest.Builder<CS>().set().build();
+
+        // FSMState2<CS> aaa = new FSMState2Builder<CS>().build();
+        var armcom = new CommandFSMBuilder<>(Arm.stow);
+        armcom.addBidirectionalConnections(1,Arm.stow,Arm.l1,Arm.l2,Arm.l3);
+        armcom.addDirectedConnections(1,Arm.bootup,Arm.stow);
+
+        armcom.addState(new CommandFSMStateBuilder<>(Arm.stow)
+            .addCommand(Commands.idle())
+            .addCompletion(()->true)
+            .build()
+        );
+        //repeat.
+
+        //TODO: Add timed transitions to command
+
     }
+
+    void setupCoralCommands(){
+
+
+    }
+
+
 
     enum CS{
         intaking,
@@ -62,7 +96,7 @@ public class Test {
         Trigger isCoralLoading=new Trigger(()->coral.inState(CS.alignForward,CS.alignReverse));
         Trigger isCoralEmpty=new Trigger(()->coral.inState(CS.unloaded));
 
-        new Trigger(DriverStation::isEnabled).whileTrue(new RunCommand(()->coral.run()).ignoringDisable(true));
+        new Trigger(DriverStation::isEnabled).whileTrue(new RunCommand(()->coral.update()).ignoringDisable(true));
 
         SmartDashboard.putData("FSM::coral",coral.getSelectableChooser());
     }
