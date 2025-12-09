@@ -43,10 +43,11 @@ public class FSM2<T extends Enum<T>> implements Sendable{
         ArrayList<Transition<U>> transitions = new ArrayList<>();
         /** Transition conditions that can interface with a state timer  */
         ArrayList<TimedTransition<U>> timedTransitions = new ArrayList<>();
-        //Pass in a switch
+        /** Pass in a switch style state selector */
         ArrayList<Supplier<U>> selectors = new ArrayList<>();
-
+        /** Items to run when switching to a state */
         ArrayList<Runnable> onEntry = new ArrayList<>();
+        /** Items to run when switching out of a state */
         ArrayList<Runnable> onExit = new ArrayList<>();
 
         public State<U> addTransition(U destinationState, BooleanSupplier transitionCondition){
@@ -93,7 +94,7 @@ public class FSM2<T extends Enum<T>> implements Sendable{
     }
 
     /** Step through the state machine logic, updating as indicated by state transitions */
-    void update(){
+    public void update(){
         state.logic.run();
 
         //Determine our next state
@@ -136,29 +137,53 @@ public class FSM2<T extends Enum<T>> implements Sendable{
     }
 
     /** Create a new state, returning it so that transitions can be added */
-    State<T> addState(T name, Runnable stateLogic){
+    public State<T> addState(T name, Runnable stateLogic){
         var newstate=new State<T>(){{logic=stateLogic;}};
         stateMap.put(name, newstate);
         return newstate;
     }
 
     /** Return the indicated state, or an empty state if one was not created yet */
-    State<T> getState(T name){
+    public State<T> getState(T name){
         return stateMap.getOrDefault(name, new State<>());
     }
 
+    /** Create several transitions at once using a single condition. <br/>
+     * Useful for external inputs such as buttons that might interact with several states, 
+     * or for seperating internal/external logic in your state machine setup 
+     * @param destinationState The state you want to transition to
+     * @param transitionCondition The signal that you're looking for
+     * @param signalAcceptingStates The states states that should respond to the signal
+     * @return
+     */
+    FSM2<T> addSignalTransition(T destinationState, BooleanSupplier transitionCondition, T... signalAcceptingStates){
+        for(var a : signalAcceptingStates){
+            if(stateMap.containsKey(a)==false){
+                throw new Error(String.format("Adding Signal Transition to %s failed due to undeclared state %s",destinationState,a));
+            }
+        }
+        for(var a : signalAcceptingStates){
+            stateMap.get(a).addTransition(destinationState, transitionCondition);
+        }
+        return this;
+    }
+
+    //////////////////////////
+    /// General usage methods
+    //////////////////////////
+
     /** Return the current operating state */
-    T getState(){
+    public T getState(){
         return stateName;
     }
 
     /** Set the state machine's state to the indicated value */
-    void setState(T name){
+    public void setState(T name){
         nextState=name;
     }
 
     /** Returns true if FSM is in one of the provided states */
-    boolean inState(T... names){
+    public boolean inState(T... names){
         for(T tag : names){
             if( stateName==tag )return true;
         }
