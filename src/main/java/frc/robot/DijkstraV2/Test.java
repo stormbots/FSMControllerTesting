@@ -9,11 +9,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.robot.DijkTesting.BuildBuild;
-import frc.robot.DijkTesting.InstInst;
-import frc.robot.DijkTesting.TestTest;
-import frc.robot.DijkTesting.WorkingComboBuilderKinda;
-import frc.robot.DijkTesting.WorkingComboBuilderKinda.Instance;
 
 public class Test {
 
@@ -21,13 +16,6 @@ public class Test {
         System.out.println("Starting coral handler");
         // setUpCoralHandler();
         djtest();
-        //This sucks because the first part is nonobvious and ide fails to help
-        WorkingComboBuilderKinda<CS>.Instance<CS> instance = new WorkingComboBuilderKinda<CS>().build();//gross
-        
-        //This works but isn't exactly less clunky
-        // InstInst<CS> trial = new BuildBuild<CS>().method().build();
-        // InstInst<CS> test2 = new InstInst<>();
-        // TestTest<CS> trial = new TestTest.Builder<CS>().set().build();
 
         // FSMState2<CS> aaa = new FSMState2Builder<CS>().build();
         var armcom = new CommandFSMBuilder<>(Arm.stow);
