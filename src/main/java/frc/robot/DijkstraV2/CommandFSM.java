@@ -114,6 +114,9 @@ public class CommandFSM<T extends Enum<T>> extends SubsystemBase{
             }
         }
 
+        //See if we have additional state updates from our goal states
+        checkAutomatedStateTransitions();
+
         //Because there's several decision states, and several states that *could* 
         // transition instantly based on external factors, we need to iterate the 
         // So, simply loop until we end up in a state that doesn't transition out immediately.
@@ -125,10 +128,36 @@ public class CommandFSM<T extends Enum<T>> extends SubsystemBase{
         }
     }
 
-    private void optimizeStatePath(){
-        //TODO impliment logic for state backtracking/optimization
+    private void checkAutomatedStateTransitions(){
+        //Avoid checking transitions while a command is actively running the FSM
+        //TODO: Check correctness of this behaviour, and maybe make it per-transition
+        //  In general I think driver/active code intent is probably correct
+        if(this.getCurrentCommand()!=null) return;
 
-        //TODO: if the queue
+        // Chec the automated transitions, and if needed path to new states
+        switch(fsm.getState()){
+            case goalComplete:
+                for(var t : currentState.whenGoalComplete){
+                    if(t.condition.getAsBoolean()){
+                        pathToState(t.dest);
+                    }
+                }
+                //intentional fallthrough ; When complete we need to check both cases
+            case goalIncomplete:
+                for(var t : currentState.whenInState){
+                    if(t.condition.getAsBoolean()){
+                        pathToState(t.dest);
+                    }
+                }
+            default:
+                //No other cases to check
+        }
+    }
+
+    private void optimizeStatePath(){
+        //TODO: Avoid restarting identical states
+
+        //TODO impliment logic for state backtracking/optimization
         // p=a, c=b, queue.first=b
     }
 
@@ -156,8 +185,10 @@ public class CommandFSM<T extends Enum<T>> extends SubsystemBase{
     
     /** Set the queue to the provided destination state */
     public void pathToState(T destination){
+        var path = stateRouter.findPath(currentState.id, destination);
+        if(path.isEmpty()) return;
         stateQueue.clear();
-        stateQueue = stateRouter.findPath(currentState.id, destination);
+        stateQueue = path;
     }
 
     /** Run to the destination state indefinitely. */
@@ -188,25 +219,33 @@ public class CommandFSM<T extends Enum<T>> extends SubsystemBase{
         return Commands.idle(this).until(()->fsm.getState()==InnerState.goalComplete);
     };
 
-    /** Compute the nearest safe state and set it as the current active state 
-     * If no recovery states are provided, the initialState used when creating this 
-     * class will be used.
-    */
-    public void recoverStates(){
+    /** Calculate the nearest recovery state; Does not perform any action or change states
+     * @return
+     */
+    public T computeNearestRecoveryState(){
         var nearest=stateMap
         .values()
         .stream()
         .filter((s)->s.stateRecoveryCost.isPresent())
         .min((a,b)->Double.compare(a.stateRecoveryCost.get().getAsDouble(), a.stateRecoveryCost.get().getAsDouble()))
-        .orElseGet(()->stateMap.get(initialState));
+        .orElseGet(()->stateMap.get(initialState))
         ;
-        
+        return nearest.id;
+    }
+
+    /** Compute the nearest safe state and set it as the current active state. 
+     * The initialState provided when creating the FSM will be used if no recovery states
+     * are configured.
+    */
+    public void recoverStates(){
+        var nearest=computeNearestRecoveryState();
         stateQueue.clear();
-        stateQueue.add(nearest.id);
+        stateQueue.add(nearest);
         fsm.setState(InnerState.recoverState);
     }
 
-    /** Compute nearest safe state and go there, exiting after successfully getting there
+    /** Compute nearest safe state, force that state, and go directly there. Command exits
+     * once the state's goal condition is met.
      */
     public Command recover(){
         return runOnce(()->fsm.setState(InnerState.recoverState)).andThen(await());

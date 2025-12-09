@@ -8,8 +8,8 @@ import java.util.function.DoubleSupplier;
 import edu.wpi.first.wpilibj2.command.Command;
 
 public class CommandFSMState<T extends Enum<T>>{
-    public class Transition<T>{
-        public T dest;
+    public static class Transition<U extends Enum<U>>{
+        public U dest;
         public BooleanSupplier condition;
     }
 
@@ -20,13 +20,10 @@ public class CommandFSMState<T extends Enum<T>>{
     /** <p>The condition that indicates transition from a previous state 
      * to this state can be considered complete. Will be referenced while 
      * iterating through states to the goal state.</p>
-     * <p>If omitted, goal and traversal will be considered equivilent.</p>
      */
     public final BooleanSupplier traversalComplete;
     /** <p>The condition that indicates whether the state's goal or main work is complete.</p>
      * <p> Only applies when the state is the FSM Goal state.</p> 
-     * 
-     * <br/><br/> If omitted, goal and traversal will be considered equivilent. 
     */
     public final BooleanSupplier goalComplete;
 

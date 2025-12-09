@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.DijkstraV2.Test;
+import frc.robot.DijkstraV2.NewTest;
 import frc.robot.FSM.FSM;
 import frc.robot.subsystems.Arm.Arm;
 import frc.robot.subsystems.Extendo.Extendo;
@@ -41,7 +42,7 @@ public class RobotContainer {
 
 
 
-  Test test = new Test();
+  NewTest test = new NewTest();
 
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
