@@ -25,31 +25,31 @@ public class FSM2<T extends Enum<T>> implements Sendable{
 
 
     /** Transition with a simple condition */
-    class Transition<T>{
-        T destination;
+    static class Transition<V extends Enum<V>>{
+        V destination;
         BooleanSupplier condition;
     }
     /** Transition where the condition is provided the runtime of the current state (in seconds) */
-    class TimedTransition<T>{
-        T destination;
+    static class TimedTransition<V extends Enum<V>>{
+        V destination;
         Function<Double,Boolean> condition;
     }
 
     /** Class containing state logic and transitions. */
-    class State<T>{
+    static class State<U extends Enum<U>>{
         /** The core logic of the state */
         Runnable logic = ()->{};
         /** Transition conditions that check external logic  */
-        ArrayList<Transition<T>> transitions = new ArrayList<>();
+        ArrayList<Transition<U>> transitions = new ArrayList<>();
         /** Transition conditions that can interface with a state timer  */
-        ArrayList<TimedTransition<T>> timedTransitions = new ArrayList<>();
+        ArrayList<TimedTransition<U>> timedTransitions = new ArrayList<>();
         //Pass in a switch
-        ArrayList<Supplier<T>> selectors = new ArrayList<>();
+        ArrayList<Supplier<U>> selectors = new ArrayList<>();
 
         ArrayList<Runnable> onEntry = new ArrayList<>();
         ArrayList<Runnable> onExit = new ArrayList<>();
 
-        public State<T> addTransition(T destinationState, BooleanSupplier transitionCondition){
+        public State<U> addTransition(U destinationState, BooleanSupplier transitionCondition){
             transitions.add(new Transition<>(){{
                 destination=destinationState;
                 condition=transitionCondition;
@@ -57,25 +57,25 @@ public class FSM2<T extends Enum<T>> implements Sendable{
             return this;
         }
         /** Add a state transition that interacts with the current state runtime (in seconds) */
-        public State<T> addTimerTransition(T destinationState, Function<Double,Boolean> transitionCondition){
-            timedTransitions.add(new TimedTransition<T>(){{
+        public State<U> addTimerTransition(U destinationState, Function<Double,Boolean> transitionCondition){
+            timedTransitions.add(new TimedTransition<U>(){{
                 destination=destinationState;
                 condition=transitionCondition;
             }});
             return this;
         }
         /** Add a function that directly computes the next state*/
-        public State<T> addSelector(Supplier<T> selectorFunction){
+        public State<U> addSelector(Supplier<U> selectorFunction){
             selectors.add(selectorFunction);
             return this;
         }
         //** Add a function that fires when entering the state */
-        public State<T> onEntry(Runnable logic){
+        public State<U> onEntry(Runnable logic){
             onEntry.add(logic);
             return this;
         }
         //** Add a function that fires when exiting the state */
-        public State<T> onExit(Runnable logic){
+        public State<U> onExit(Runnable logic){
             onExit.add(logic);
             return this;
         }
