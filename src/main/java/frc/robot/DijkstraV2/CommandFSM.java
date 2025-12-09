@@ -90,7 +90,11 @@ public class CommandFSM<T extends Enum<T>> extends SubsystemBase{
         ;
         
         //Initialize our operational states
-        offlineState = new CommandFSMState<T>(initialState, Commands.idle(), ()->true, ()->false);
+        offlineState = new CommandFSMState<T>(initialState){{
+            addCommand(Commands.idle());
+            addGoalCompletion(()->false);
+            addTraversalCompletion(()->true);
+        }};
         currentState=offlineState;
         priorState=offlineState;
         stateQueue=new ArrayList<>();

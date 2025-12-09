@@ -34,10 +34,10 @@ public class Test {
         armcom.addBidirectionalConnections(1,Arm.stow,Arm.l1,Arm.l2,Arm.l3);
         armcom.addDirectedConnections(1,Arm.bootup,Arm.stow);
 
-        armcom.addState(new CommandFSMStateBuilder<>(Arm.stow)
+        armcom.addState(new CommandFSMState<>(Arm.stow)
             .addCommand(Commands.idle())
             .addCompletion(()->true)
-            .build()
+            .validate()
         );
         //repeat.
 

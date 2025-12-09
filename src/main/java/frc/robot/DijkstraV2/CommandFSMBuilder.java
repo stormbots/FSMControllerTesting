@@ -48,29 +48,19 @@ public class CommandFSMBuilder<T extends Enum<T>> {
      * @return
      */
     public CommandFSMBuilder<T> addState(CommandFSMState<T> state){
-        states.put(state.id, state);
-        return this;
-    }
-
-    /** Add a state using it's builder; You probably want to use 
-     * {@link #CommandFSMBuilder(Enum)} or {@link #buildState(Enum)}for generating that state.
-     * @param state
-     * @return
-     */
-    public CommandFSMBuilder<T> addState(CommandFSMStateBuilder<T> stateBuilder){
-        var state=stateBuilder.build();
+        state.validate();
         states.put(state.id, state);
         return this;
     }
 
     /** Build a StateBuilder object and return it to generate new states. 
      * Does not add it to the state; You'll need to add it using 
-     * {@link #addState(CommandFSMState)}
+     * {@link #addState(CommandFSMStateRedundant)}
      * @param id
      * @return
      */
-    public CommandFSMStateBuilder<T> buildState(T id){
-        return new CommandFSMStateBuilder<T>(id);
+    public CommandFSMState<T> buildState(T id){
+        return new CommandFSMState<T>(id);
     }
 
     /** Exit the builder, validating the FSM and returning it for use.
