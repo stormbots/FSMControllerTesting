@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.DoubleSupplier;
 
 /** 
@@ -31,15 +32,15 @@ import java.util.function.DoubleSupplier;
  */
 public class DijkstraV2<T extends Enum<T>> {
     /** Holds the traversal costs between any given nodes */
-    class Edge<T>{
-        public final T source;
-        public final T destination;
+    public static class Edge<U extends Enum<U>>{
+        public final U source;
+        public final U destination;
         public final double cost;
         public final DoubleSupplier dynamicCost;
-        public Edge(T source, T dest, double cost){
+        public Edge(U source, U dest, double cost){
             this.source=source; this.cost=cost; this.destination=dest; this.dynamicCost=()->this.cost;
         };
-        public Edge(T source, T dest, double fixedCost, DoubleSupplier dynamicCost){
+        public Edge(U source, U dest, double fixedCost, DoubleSupplier dynamicCost){
             this.source=source; this.cost=fixedCost; this.destination=dest; this.dynamicCost=dynamicCost;
         };
         public String toString(){
@@ -50,22 +51,21 @@ public class DijkstraV2<T extends Enum<T>> {
     /** The Vertex describes the graph nodes, and during traversal holds the costs 
      * related to travelling to any particular node.
       */
-    class Vertex<T> implements Comparable<Vertex<T>>{
-        public final T id;
+    public static class Vertex<V extends Enum<V>> implements Comparable<Vertex<V>>{
+        public final V id;
         public double cost=9999;
-        public T prev=null;
+        public V prev=null;
         public final DoubleSupplier costfunction;
 
         @Override
-        public int compareTo(Vertex<T> o) {
+        public int compareTo(Vertex<V> o) {
             return Double.compare(cost,o.cost);
         }
-        public Vertex(T id){this.id=id;this.costfunction=()->this.cost;}
-        public Vertex(T id, DoubleSupplier costfunction){this.id=id;this.costfunction=costfunction;}
+        public Vertex(V id){this.id=id;this.costfunction=()->this.cost;}
+        public Vertex(V id, DoubleSupplier costfunction){this.id=id;this.costfunction=costfunction;}
         public String toString(){
             return String.format("Vertex[%s]",id);
         }
-
     }
 
     //The core datastructures needed for the graph
@@ -96,6 +96,11 @@ public class DijkstraV2<T extends Enum<T>> {
         //Clean up our storage 
         path.clear();
         unvisited.clear();
+
+        // Avoid computing things if we're already at the destination state
+        if(source==destination){
+            return path;
+        }
 
         //The algorithm only works if these two exist.
         if(nodes.containsKey(source)==false) return path;
@@ -192,6 +197,41 @@ public class DijkstraV2<T extends Enum<T>> {
             addConnection(states[i],states[i-1],cost);
         }
         return this;
+    }
+
+    ///////////////////////
+    // Runtime commands ///
+    ///////////////////////
+
+    /** Return the current path reference */
+    public List<T> getPath(){
+        return path;
+    }
+
+    /** Drop the current state from the computed path */
+    public DijkstraV2<T> drop(T currentState){
+        if(path.size()>0 && path.get(0) == currentState){
+            path.remove(0);
+        }
+        return this;
+    }
+
+    /** Get the next state, removing it from the state queue. */
+    public Optional<T> popNextState(T currentState){
+        drop(currentState);
+        if(path.size()==0){ 
+            return Optional.empty(); 
+        }
+        return Optional.of(path.remove(0));
+    }
+
+    /** Return the next state in the path sequence, leaving the path unmodified */
+    public Optional<T> peekNextState(T currentState){
+        drop(currentState);
+        if(path.size()==0){ 
+            return Optional.empty(); 
+        }
+        return Optional.of(path.get(0));
     }
 
 }

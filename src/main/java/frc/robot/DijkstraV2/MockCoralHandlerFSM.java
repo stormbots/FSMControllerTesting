@@ -9,7 +9,6 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -42,7 +41,7 @@ public class MockCoralHandlerFSM extends SubsystemBase {
   }
 
   private void configureFSM(){
-    fsm.addState(CS.intaking, ()->motor.set(1))
+    fsm.addState(CS.intaking, runTrapProfile(3))
     .addTransition(CS.alignReverse, coralDetected);
     ;
 
@@ -86,7 +85,8 @@ public class MockCoralHandlerFSM extends SubsystemBase {
 
     fsm.validate();
 
-    SmartDashboard.putData("FSM::coral",fsm);
+    SmartDashboard.putData("FSM/Coral/fsm",fsm);
+    SmartDashboard.putData("FSM/coral/chooser",fsm.getSelectableChooser());
     new Trigger(DriverStation::isEnabled).onTrue(Commands.runOnce(()->fsm.setState(CS.unloaded)));
 
   }
@@ -106,8 +106,16 @@ public class MockCoralHandlerFSM extends SubsystemBase {
     return startEnd(()->scoreSignal=true, ()->scoreSignal=false);
   }
 
-  Trigger isCoralLoaded=new Trigger(()->fsm.inState(CS.intaking,CS.unloaded)).negate();
-  Trigger isCoralLoading=new Trigger(()->fsm.inState(CS.intaking,CS.alignForward,CS.alignReverse));
-  Trigger isCoralEmpty=new Trigger(()->fsm.inState(CS.unloaded));
+  Trigger isCoralLoaded=new Trigger(()->fsm.isInState(CS.intaking,CS.unloaded)).negate();
+  Trigger isCoralLoading=new Trigger(()->fsm.isInState(CS.intaking,CS.alignForward,CS.alignReverse));
+  Trigger isCoralEmpty=new Trigger(()->fsm.isInState(CS.unloaded));
   
+
+  public Command runTrapProfile(double velocity){
+      return startRun(()->{
+        //init stuff
+      }, ()->{
+        //do the thing.
+      });
+  }
 }

@@ -10,6 +10,7 @@ import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
 
 public class FSM2<T extends Enum<T>> implements Sendable{
     /** Initial state the FSM boots into, and used for resets */
@@ -93,7 +94,9 @@ public class FSM2<T extends Enum<T>> implements Sendable{
         var kind = initialState.getClass();
     }
 
-    /** Step through the state machine logic, updating as indicated by state transitions */
+    /** Step through the state machine logic, updating as indicated by state transitions 
+     * Should be run once per robot loop while robot is enabled
+    */
     public void update(){
         state.logic.run();
 
@@ -143,6 +146,85 @@ public class FSM2<T extends Enum<T>> implements Sendable{
         return newstate;
     }
 
+    /**
+     * TODO Test me!
+     * Create a state using a Command, ignoring it's typical requirements and 
+     * exit condition.
+     * </p>
+     * This is what you want when the FSM itself requires all controlled hardware,
+     * and conflicting Commands will halt the FSM, or simply do not exist.</p>
+     * See also {@link #addState(Enum, Enum, Command)} to create a state that 
+     * does transition.
+     * @param name
+     * @param stateCommand
+     * @return
+     */
+    public State<T> addState(T name, Command stateCommand){
+        var newstate=new State<T>(){{
+            //Run the state logic
+            super.onEntry.add(stateCommand::initialize);
+            super.logic=stateCommand::execute; //The state controls it's own logic
+            super.onExit.add(stateCommand::cancel);
+            // super.addTransition(null, stateCommand::isFinished);
+        }};
+        stateMap.put(name, newstate);
+        return newstate;
+    }
+
+    /**
+     * TODO Test me!
+     * <p>Create a state using a Command, ignoring it's typical requirements. 
+     * When the command completes, will transition to the destination state.
+     * </p>
+     * <p>This is what you want when using FSM is the only exposed
+     * "control interface" for subsystem commands, and not actuators.</p>
+     * See also {@link #addState(Enum, Enum, Command)} to create a state that 
+     * does transition.
+     * @param name
+     * @param destinationState
+     * @param stateCommand
+     * @return
+     */
+    public State<T> addState(T name, T destinationState, Command stateCommand){
+        var newstate=new State<T>(){{
+            super.onEntry.add(stateCommand::initialize);
+            super.logic=stateCommand::execute; //The state controls it's own logic
+            super.onExit.add(stateCommand::cancel);
+            super.addTransition(destinationState, stateCommand::isFinished);
+        }};
+        stateMap.put(name, newstate);
+        return newstate;
+    }
+
+    /** <p>Add a state, running a Command as it's state operation, meaning it runs 
+     * with it's standard requirements.</p>
+     * <p>Note: this will cause conflicts if the FSM <i>and</i> external commands both
+     * require the same subsystem!</p> 
+     * <p>Intended for use when the FSM is not a controlled resource, but state resources 
+     * might be, such as for superstructure state machines </p> 
+     * <p>If the provided state is cancelled, the FSM will not restart the command!</p> 
+     * @param name
+     * @param destinationState the state to transition to on successful completion of command
+     * @param stateCommand 
+     * @return
+     */
+    public State<T> addStateWithRequirements(
+        T name,
+        T destinationState,
+        Command stateCommand
+    ){
+        var newstate=new State<T>(){{
+            super.onEntry.add(()->stateCommand.schedule());
+            // super.onEntry.add(()->stateCommand.initialize());  //State handles it
+            super.logic=()->{}; //The state controls it's own logic
+            super.onExit.add(stateCommand::cancel); // Cancel the command if it didn't exit normally
+            super.addTransition(destinationState, stateCommand::isFinished);
+        }};
+        stateMap.put(name, newstate);
+        return newstate;
+    }
+
+
     /** Return the indicated state, or an empty state if one was not created yet */
     public State<T> getState(T name){
         return stateMap.getOrDefault(name, new State<>());
@@ -183,12 +265,26 @@ public class FSM2<T extends Enum<T>> implements Sendable{
     }
 
     /** Returns true if FSM is in one of the provided states */
-    public boolean inState(T... names){
+    public boolean isInState(T... names){
         for(T tag : names){
             if( stateName==tag )return true;
         }
         return false;
     }
+
+    /**
+     * Convenience function to check if a specific state is in a list of states.
+     * @param query A state of interest
+     * @param names The list of states to match against
+     * @return
+     */
+    public boolean isStateInList(T query, T... names){
+        for(T tag : names){
+            if( query==tag )return true;
+        }
+        return false;
+    }
+    
 
     /** Validate the state machine's completeness. <br/>
      * Does nothing if all states are defined. <br/>
